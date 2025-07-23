@@ -703,10 +703,13 @@ if (loader) {
                                 scene.remove(rollingGltf.scene);
                                 gameState.playerModel.visible = true;
                                 
+                                // カメラ状態の復元は行わない（自然な動作のため）
+                                
                                 // ローリング状態をリセット
                                 isRollingAnimationPlaying = false;
                                 gameState.isRolling = false;
                                 gameState.rollingStartPosition = null;
+                                // カメラ関連変数は遷移処理で管理するのでここではクリアしない
                                 
                                 // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
                                 const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
@@ -1181,6 +1184,7 @@ function movePlayer() {
     let moveDirectionX = 0;
     let moveDirectionZ = 0;
     
+
     // ローリングアニメーション再生中の特別処理
     if (isRollingAnimationPlaying && gameState.rollingStartPosition && playerAnimations['rolling']) {
         // ローリングの進行度を計算（アニメーションの経過時間に基づく、タイムスケール考慮）
@@ -1206,14 +1210,14 @@ function movePlayer() {
         const modelWorldPosition = new THREE.Vector3();
         rollingData.scene.getWorldPosition(modelWorldPosition);
         
-        // プレイヤーの論理的位置は開始位置をベースに少しずつ更新
-        const minimalMovementRatio = 0.3; // 最小限の移動のみ
+        // プレイヤー位置を徐々に更新（カメラが自然に追従するように）
         const easedProgress = clampedProgress * clampedProgress * (3.0 - 2.0 * clampedProgress);
         
-        const currentX = gameState.rollingStartPosition.x + (forwardX * gameState.rollingDistance * easedProgress * minimalMovementRatio);
-        const currentZ = gameState.rollingStartPosition.z + (forwardZ * gameState.rollingDistance * easedProgress * minimalMovementRatio);
+        // ローリング進行に合わせて位置を更新
+        const currentX = gameState.rollingStartPosition.x + (forwardX * gameState.rollingDistance * easedProgress);
+        const currentZ = gameState.rollingStartPosition.z + (forwardZ * gameState.rollingDistance * easedProgress);
         
-        // プレイヤー位置を更新（控えめに）
+        // プレイヤー位置を更新
         gameState.playerPosition.x = currentX;
         gameState.playerPosition.z = currentZ;
         
@@ -1225,9 +1229,7 @@ function movePlayer() {
         );
         rollingData.scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
         
-        // カメラの更新
-        updateCamera(gameState, controls, camera);
-        return;
+        // ローリング中も通常通り処理を継続（カメラは自然に動作）
     }
     
     // 攻撃アニメーション再生中は移動を制限

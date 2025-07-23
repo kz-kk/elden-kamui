@@ -115,14 +115,14 @@ export function updateCamera(gameState, controls, camera) {
     // カメラモードに応じた更新
     if (gameState.followPlayerCamera) {
         // プレイヤー追随カメラモード（ドラッグ可能）
-        // ターゲットはプレイヤーに常に追従
-        controls.target.copy(gameState.playerPosition);
+        // ターゲットはプレイヤーに滑らかに追従
+        controls.target.lerp(gameState.playerPosition, 0.1);
         
         // カメラ位置を更新
         updateFollowCameraPosition(gameState, camera);
     } else if (gameState.freeCamera || gameState.orbitPlayerCamera) {
         // 自由カメラモードとプレイヤー軌道カメラモードでは、
-        // プレイヤーが移動したらOrbitControlsのターゲットを更新
-        controls.target.copy(gameState.playerPosition);
+        // プレイヤーが移動したらOrbitControlsのターゲットを滑らかに更新
+        controls.target.lerp(gameState.playerPosition, 0.05); // より遅い追従
     }
 } 
