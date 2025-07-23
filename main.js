@@ -97,7 +97,7 @@ const gameState = {
     isRolling: false, // ローリング（回転）中かどうか
     rollingCooldown: 0, // ローリングのクールダウン時間
     rollingStartPosition: null, // ローリング開始時の位置
-    rollingDistance: 2.0, // ローリングで進む距離
+    rollingDistance: 8.0, // ローリングで進む距離（さらに増加）
     rollingBackOffset: 1.0, // ローリングアニメーションが後退する距離のオフセット
     // 炎エフェクト関連のパラメータ
     flameEffects: [], // 炎エフェクトを管理する配列
@@ -630,8 +630,41 @@ if (loader) {
                 loader.load('assets/knight/rolling.glb', (rollingGltf) => {
                     console.log("プレイヤーローリングモデル読み込み成功:", rollingGltf);
                     if (rollingGltf.animations && rollingGltf.animations.length > 0) {
-                        // ローリングアニメーションを保存
-                        const rollingAction = mixer.clipAction(rollingGltf.animations[0]);
+                        // ローリング専用のモデルとマテリアルを設定
+                        rollingGltf.scene.scale.set(2, 2, 2);
+                        rollingGltf.scene.position.copy(gameState.playerPosition);
+                        
+                        // マテリアルを調整（wait.glbと同様の処理）
+                        rollingGltf.scene.traverse(function(child) {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                
+                                if (child.material) {
+                                    const newMat = new THREE.MeshPhysicalMaterial();
+                                    
+                                    if (child.material.map) newMat.map = child.material.map;
+                                    if (child.material.normalMap) newMat.normalMap = child.material.normalMap;
+                                    if (child.material.color) newMat.color.copy(child.material.color);
+                                    
+                                    newMat.metalness = 1.0;
+                                    newMat.roughness = 0.1;
+                                    newMat.envMapIntensity = 2.0;
+                                    newMat.reflectivity = 1.0;
+                                    newMat.clearcoat = 0.5;
+                                    newMat.clearcoatRoughness = 0.1;
+                                    newMat.side = THREE.DoubleSide;
+                                    newMat.needsUpdate = true;
+                                    
+                                    child.material = newMat;
+                                }
+                            }
+                        });
+                        
+                        // ローリング専用のミキサーを作成
+                        const rollingMixer = new THREE.AnimationMixer(rollingGltf.scene);
+                        const rollingAction = rollingMixer.clipAction(rollingGltf.animations[0]);
+                        
                         // ループしないように設定
                         rollingAction.loop = THREE.LoopOnce;
                         rollingAction.clampWhenFinished = true;
@@ -640,11 +673,40 @@ if (loader) {
                         rollingAction.setEffectiveWeight(1.0);
                         
                         // アニメーション終了時のイベントを設定
-                        mixer.addEventListener('finished', function(e) {
+                        rollingMixer.addEventListener('finished', function(e) {
                             if (isRollingAnimationPlaying) {
                                 console.log("ローリングアニメーション終了");
+                                
+                                // ローリング終了位置に確実に移動
+                                if (gameState.rollingStartPosition) {
+                                    const forwardX = Math.sin(gameState.playerRotation);
+                                    const forwardZ = Math.cos(gameState.playerRotation);
+                                    
+                                    // ローリング距離分だけ前進
+                                    const finalX = gameState.rollingStartPosition.x + (forwardX * gameState.rollingDistance);
+                                    const finalZ = gameState.rollingStartPosition.z + (forwardZ * gameState.rollingDistance);
+                                    
+                                    // プレイヤー位置を最終位置に更新
+                                    gameState.playerPosition.x = finalX;
+                                    gameState.playerPosition.z = finalZ;
+                                    
+                                    console.log("ローリング終了位置設定:", { x: finalX, z: finalZ });
+                                    console.log("移動距離:", gameState.rollingDistance);
+                                    
+                                    // モデル位置も最終位置に設定
+                                    if (gameState.playerModel) {
+                                        gameState.playerModel.position.copy(gameState.playerPosition);
+                                    }
+                                }
+                                
+                                // ローリングモデルを非表示にして、元のモデルを表示
+                                scene.remove(rollingGltf.scene);
+                                gameState.playerModel.visible = true;
+                                
+                                // ローリング状態をリセット
                                 isRollingAnimationPlaying = false;
-                                gameState.rollingStartPosition = null; // 位置情報をクリア
+                                gameState.isRolling = false;
+                                gameState.rollingStartPosition = null;
                                 
                                 // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
                                 const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
@@ -671,10 +733,16 @@ if (loader) {
                                         currentAnimation.play();
                                     }
                                 }
+                                
+                                console.log("ローリング最終位置:", gameState.playerPosition);
                             }
                         });
                         
-                        playerAnimations['rolling'] = rollingAction;
+                        playerAnimations['rolling'] = {
+                            action: rollingAction,
+                            scene: rollingGltf.scene,
+                            mixer: rollingMixer
+                        };
                         
                         // ローリングアニメーションの位置変換を調査
                         analyzeAnimation(rollingGltf.animations[0]);
@@ -1022,7 +1090,7 @@ try {
                 }
                 
                 // ローリングアニメーション（Rキー）
-                if ((e.key === 'r' || e.key === 'R') && !isRollingAnimationPlaying && playerAnimations['rolling'] && gameState.playerModel) {
+                if ((e.key === 'r' || e.key === 'R') && !isRollingAnimationPlaying && !gameState.isRolling && gameState.rollingCooldown <= 0 && playerAnimations['rolling'] && gameState.playerModel) {
                     // 実行前のプレイヤー位置と回転を保存
                     const originalPosition = gameState.playerPosition.clone();
                     const originalRotation = gameState.playerRotation;
@@ -1031,48 +1099,43 @@ try {
                     const forwardX = Math.sin(gameState.playerRotation);
                     const forwardZ = Math.cos(gameState.playerRotation);
                     
-                    // ローリングアニメーションの特性を考慮
-                    // アニメーションは一度後ろに下がってから前に進むので、
-                    // 実際の開始位置を進行方向に加算して調整する
+                    // ローリング開始位置を設定（現在の位置から開始）
+                    gameState.rollingStartPosition = originalPosition.clone();
                     
-                    // 調整された位置を計算（ローリング全体の距離の分け前進位置からスタート）
-                    const adjustedPosition = originalPosition.clone();
-                    // ローリングが後退するオフセット分を加算して、実質的にその場から前進するように
-                    adjustedPosition.x += forwardX * gameState.rollingBackOffset;
-                    adjustedPosition.z += forwardZ * gameState.rollingBackOffset;
-                    
-                    console.log("元の位置:", originalPosition);
-                    console.log("調整後の位置:", adjustedPosition);
-                    
-                    // アニメーション開始位置として調整後の位置を設定
-                    gameState.rollingStartPosition = adjustedPosition.clone();
-                    gameState.playerPosition.copy(adjustedPosition);
+                    console.log("ローリング開始位置:", originalPosition);
+                    console.log("移動方向:", { x: forwardX, z: forwardZ });
                     
                     // 既存のアニメーションを停止
                     if (currentAnimation && typeof currentAnimation.stop === 'function') {
                         currentAnimation.stop();
                     }
                     
-                    // モデルの初期位置と回転を明示的に設定
-                    gameState.playerModel.position.copy(adjustedPosition);
-                    gameState.playerModel.rotation.y = originalRotation + gameState.playerModelRotationOffset;
+                    // 元のモデルを非表示にする
+                    gameState.playerModel.visible = false;
+                    
+                    // ローリング専用モデルを表示
+                    const rollingData = playerAnimations['rolling'];
+                    rollingData.scene.position.copy(gameState.playerPosition);
+                    rollingData.scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
+                    scene.add(rollingData.scene);
                     
                     // ローリングアニメーションを設定
-                    currentAnimation = playerAnimations['rolling'];
+                    currentAnimation = rollingData.action;
                     currentAnimation.reset();
-                    currentAnimation.timeScale = 1.0;
+                    currentAnimation.timeScale = 1.5; // アニメーション速度を上げる
+                    currentAnimation.setEffectiveTimeScale(1.5); // タイムスケールを明示的に設定
                     
-                    // スケルトンの位置をリセット
-                    if (gameState.playerModel.skeleton) {
-                        gameState.playerModel.skeleton.pose();
-                    }
-                    
-                    // アニメーション再生
+                    // アニメーションの前半（屈む部分）をスキップして途中から開始
+                    const clipDuration = currentAnimation.getClip().duration;
+                    currentAnimation.time = clipDuration * 0.3; // アニメーションの20%地点から開始
                     currentAnimation.play();
                     
                     // ローリング状態を設定
                     isRollingAnimationPlaying = true;
-                    console.log("ローリングアニメーション開始 - 調整位置から開始");
+                    gameState.isRolling = true;
+                    gameState.rollingCooldown = 15; // クールダウン設定（短縮）
+                    
+                    console.log("ローリングアニメーション開始 - 向いている方向に移動");
                 }
                 
                 // 音楽再生（ユーザーインタラクション後に再生開始）
@@ -1119,22 +1182,48 @@ function movePlayer() {
     let moveDirectionZ = 0;
     
     // ローリングアニメーション再生中の特別処理
-    if (isRollingAnimationPlaying) {
-        // アニメーション中は位置を直接制御せず、アニメーションの動きに従わせる
-        // ただし極端な位置ずれがある場合のみ修正
-        const modelPosition = gameState.playerModel.position.clone();
+    if (isRollingAnimationPlaying && gameState.rollingStartPosition && playerAnimations['rolling']) {
+        // ローリングの進行度を計算（アニメーションの経過時間に基づく、タイムスケール考慮）
+        const clipDuration = currentAnimation ? currentAnimation.getClip().duration : 1;
+        const adjustedDuration = clipDuration / 1.5; // タイムスケール1.5を考慮
+        const startOffset = clipDuration * 0.2; // 20%地点から開始したことを考慮
         
-        // 極端な位置ずれ（10単位以上）がある場合のみ修正
-        if (modelPosition.distanceTo(gameState.playerPosition) > 10.0) {
-            console.log("極端な位置ずれを修正");
-            gameState.playerModel.position.copy(gameState.playerPosition);
-        } else {
-            // アニメーションの動きに合わせて位置を更新
-            gameState.playerPosition.copy(gameState.playerModel.position);
-        }
+        // アニメーション開始地点から現在時点までの進行度を計算
+        const currentTime = currentAnimation ? currentAnimation.time : startOffset;
+        const progressTime = Math.max(0, currentTime - startOffset);
+        const effectiveDuration = clipDuration - startOffset;
+        const rollingProgress = progressTime / effectiveDuration;
+        const clampedProgress = Math.min(Math.max(rollingProgress, 0), 1);
         
-        // 向きは維持
-        gameState.playerModel.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
+        // プレイヤーの向きに基づいて移動方向を計算
+        const forwardX = Math.sin(gameState.playerRotation);
+        const forwardZ = Math.cos(gameState.playerRotation);
+        
+        // アニメーション中はアニメーション自体の移動に任せて、位置追跡のみ行う
+        const rollingData = playerAnimations['rolling'];
+        
+        // ローリングモデルの実際の位置を取得
+        const modelWorldPosition = new THREE.Vector3();
+        rollingData.scene.getWorldPosition(modelWorldPosition);
+        
+        // プレイヤーの論理的位置は開始位置をベースに少しずつ更新
+        const minimalMovementRatio = 0.3; // 最小限の移動のみ
+        const easedProgress = clampedProgress * clampedProgress * (3.0 - 2.0 * clampedProgress);
+        
+        const currentX = gameState.rollingStartPosition.x + (forwardX * gameState.rollingDistance * easedProgress * minimalMovementRatio);
+        const currentZ = gameState.rollingStartPosition.z + (forwardZ * gameState.rollingDistance * easedProgress * minimalMovementRatio);
+        
+        // プレイヤー位置を更新（控えめに）
+        gameState.playerPosition.x = currentX;
+        gameState.playerPosition.z = currentZ;
+        
+        // ローリング専用モデルは開始位置に固定（アニメーション自体の移動を活かす）
+        rollingData.scene.position.set(
+            gameState.rollingStartPosition.x,
+            gameState.playerPosition.y,
+            gameState.rollingStartPosition.z
+        );
+        rollingData.scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
         
         // カメラの更新
         updateCamera(gameState, controls, camera);
@@ -1360,9 +1449,17 @@ function animate() {
     // アニメーションの更新
     if (mixer) mixer.update(delta);
     if (dragonMixer) dragonMixer.update(delta);
+    
+    // ローリングアニメーション専用ミキサーの更新
+    if (isRollingAnimationPlaying && playerAnimations['rolling'] && playerAnimations['rolling'].mixer) {
+        playerAnimations['rolling'].mixer.update(delta);
+    }
 
     // 各種エフェクトを更新
     updateAllEffects(gameState, scene);
+
+    // クールダウンタイマーの更新
+    if (gameState.rollingCooldown > 0) gameState.rollingCooldown--;
 
     // プレイヤーの移動処理
     if (!gameState.isLoading) {

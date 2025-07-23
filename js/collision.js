@@ -242,53 +242,55 @@ export function checkCollisions(gameState) {
         }
     }
     
-    // 空中の炎とプレイヤーの衝突判定
-    for (let i = 0; i < gameState.dragonFlameEffects.length; i++) {
-        const flame = gameState.dragonFlameEffects[i];
-        
-        // flame.geometryが存在するか確認
-        if (!flame.geometry || !flame.geometry.attributes || !flame.geometry.attributes.position) {
-            console.warn("炎エフェクトのジオメトリが不正です", flame);
-            continue;
-        }
-        
-        const positions = flame.geometry.attributes.position.array;
-        const isGroundFlame = flame.geometry.attributes.isGroundFlame ? flame.geometry.attributes.isGroundFlame.array : null;
-        
-        // パーティクルの数を制限して処理を軽くする（全パーティクルをチェックすると重い）
-        const checkStep = 30; // 30個おきにチェック
-        const maxParticles = positions.length / 3;
-        
-        // 各パーティクルとの距離をチェック
-        for (let j = 0; j < positions.length; j += 3 * checkStep) {
-            // 配列の範囲外アクセスを防止
-            if (j >= positions.length) break;
+    // 空中の炎とプレイヤーの衝突判定（ジャンプ中は当たらない）
+    if (!gameState.isJumping) {
+        for (let i = 0; i < gameState.dragonFlameEffects.length; i++) {
+            const flame = gameState.dragonFlameEffects[i];
             
-            // 地面の炎は別処理で判定するためスキップ
-            const particleIndex = Math.floor(j / 3);
-            if (isGroundFlame && isGroundFlame[particleIndex] === 1) continue;
-            
-            const particlePos = new THREE.Vector3(
-                positions[j],
-                positions[j + 1],
-                positions[j + 2]
-            );
-            
-            // 画面外に移動したパーティクル（2000,2000,2000）は無視
-            if (particlePos.x > 1000 || particlePos.y > 1000 || particlePos.z > 1000) {
+            // flame.geometryが存在するか確認
+            if (!flame.geometry || !flame.geometry.attributes || !flame.geometry.attributes.position) {
+                console.warn("炎エフェクトのジオメトリが不正です", flame);
                 continue;
             }
             
-            // パーティクルとプレイヤーの距離を計算
-            const distance = particlePos.distanceTo(playerPos);
+            const positions = flame.geometry.attributes.position.array;
+            const isGroundFlame = flame.geometry.attributes.isGroundFlame ? flame.geometry.attributes.isGroundFlame.array : null;
             
-            // 衝突判定（距離がプレイヤーの半径 + パーティクルサイズより小さい場合）
-            if (distance < playerRadius + (gameState.dragonFlameSize || 1.0)) {
-                console.log(`空中の炎との衝突を検出！距離: ${distance.toFixed(2)}`);
+            // パーティクルの数を制限して処理を軽くする（全パーティクルをチェックすると重い）
+            const checkStep = 30; // 30個おきにチェック
+            const maxParticles = positions.length / 3;
+            
+            // 各パーティクルとの距離をチェック
+            for (let j = 0; j < positions.length; j += 3 * checkStep) {
+                // 配列の範囲外アクセスを防止
+                if (j >= positions.length) break;
                 
-                // ダメージを与える
-                applyDamage(gameState, 15, gameOver); // 空中の炎は少し強いダメージ
-                return; // 一度ダメージを受けたら処理を終了
+                // 地面の炎は別処理で判定するためスキップ
+                const particleIndex = Math.floor(j / 3);
+                if (isGroundFlame && isGroundFlame[particleIndex] === 1) continue;
+                
+                const particlePos = new THREE.Vector3(
+                    positions[j],
+                    positions[j + 1],
+                    positions[j + 2]
+                );
+                
+                // 画面外に移動したパーティクル（2000,2000,2000）は無視
+                if (particlePos.x > 1000 || particlePos.y > 1000 || particlePos.z > 1000) {
+                    continue;
+                }
+                
+                // パーティクルとプレイヤーの距離を計算
+                const distance = particlePos.distanceTo(playerPos);
+                
+                // 衝突判定（距離がプレイヤーの半径 + パーティクルサイズより小さい場合）
+                if (distance < playerRadius + (gameState.dragonFlameSize || 1.0)) {
+                    console.log(`空中の炎との衝突を検出！距離: ${distance.toFixed(2)}`);
+                    
+                    // ダメージを与える
+                    applyDamage(gameState, 15, gameOver); // 空中の炎は少し強いダメージ
+                    return; // 一度ダメージを受けたら処理を終了
+                }
             }
         }
     }
