@@ -683,9 +683,8 @@ if (loader) {
                                     gameState.playerModel.position.copy(gameState.playerPosition);
                                 }
                                 
-                                // ローリングモデルを非表示にして、元のモデルを表示
+                                // ローリングモデルを非表示にする
                                 scene.remove(rollingGltf.scene);
-                                gameState.playerModel.visible = true;
                                 
                                 // カメラ状態の復元は行わない（自然な動作のため）
                                 
@@ -698,6 +697,16 @@ if (loader) {
                                 // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
                                 const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
                                 if (isMoving && playerAnimations['run']) {
+                                    // 待機モデルを非表示
+                                    gameState.playerModel.visible = false;
+                                    
+                                    // 走りモデルを表示
+                                    if (playerAnimations['run'].scene) {
+                                        scene.add(playerAnimations['run'].scene);
+                                        playerAnimations['run'].scene.position.copy(gameState.playerPosition);
+                                        playerAnimations['run'].scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
+                                    }
+                                    
                                     if (typeof currentAnimation.stop === 'function') {
                                         currentAnimation.stop();
                                     }
@@ -709,6 +718,14 @@ if (loader) {
                                         currentAnimation.play();
                                     }
                                 } else if (playerAnimations['wait']) {
+                                    // 走りモデルを削除（もし表示されていれば）
+                                    if (playerAnimations['run'] && playerAnimations['run'].scene) {
+                                        scene.remove(playerAnimations['run'].scene);
+                                    }
+                                    
+                                    // 待機モデルを表示
+                                    gameState.playerModel.visible = true;
+                                    
                                     if (typeof currentAnimation.stop === 'function') {
                                         currentAnimation.stop();
                                     }
@@ -1099,6 +1116,11 @@ try {
                     
                     // 元のモデルを非表示にする
                     gameState.playerModel.visible = false;
+                    
+                    // 走りモデルが表示されている場合は非表示にする
+                    if (playerAnimations['run'] && playerAnimations['run'].scene) {
+                        scene.remove(playerAnimations['run'].scene);
+                    }
                     
                     // ローリング専用モデルを表示
                     const rollingData = playerAnimations['rolling'];
