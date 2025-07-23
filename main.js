@@ -97,8 +97,8 @@ const gameState = {
     isRolling: false, // ローリング（回転）中かどうか
     rollingCooldown: 0, // ローリングのクールダウン時間
     rollingStartPosition: null, // ローリング開始時の位置
-    rollingDistance: 8.0, // ローリングで進む距離（さらに増加）
-    rollingBackOffset: 1.0, // ローリングアニメーションが後退する距離のオフセット
+    rollingDistance: 5.0, // ローリングで進む距離（さらに増加）
+    rollingBackOffset: 0.0, // ローリングアニメーションが後退する距離のオフセット
     // 炎エフェクト関連のパラメータ
     flameEffects: [], // 炎エフェクトを管理する配列
     flameCooldown: 0, // 炎エフェクト発動のクールダウン時間
@@ -677,26 +677,10 @@ if (loader) {
                             if (isRollingAnimationPlaying) {
                                 console.log("ローリングアニメーション終了");
                                 
-                                // ローリング終了位置に確実に移動
-                                if (gameState.rollingStartPosition) {
-                                    const forwardX = Math.sin(gameState.playerRotation);
-                                    const forwardZ = Math.cos(gameState.playerRotation);
-                                    
-                                    // ローリング距離分だけ前進
-                                    const finalX = gameState.rollingStartPosition.x + (forwardX * gameState.rollingDistance);
-                                    const finalZ = gameState.rollingStartPosition.z + (forwardZ * gameState.rollingDistance);
-                                    
-                                    // プレイヤー位置を最終位置に更新
-                                    gameState.playerPosition.x = finalX;
-                                    gameState.playerPosition.z = finalZ;
-                                    
-                                    console.log("ローリング終了位置設定:", { x: finalX, z: finalZ });
-                                    console.log("移動距離:", gameState.rollingDistance);
-                                    
-                                    // モデル位置も最終位置に設定
-                                    if (gameState.playerModel) {
-                                        gameState.playerModel.position.copy(gameState.playerPosition);
-                                    }
+                                // ローリング中に既に位置更新済みなので、ここでは位置設定不要
+                                // モデル位置のみ同期
+                                if (gameState.playerModel) {
+                                    gameState.playerModel.position.copy(gameState.playerPosition);
                                 }
                                 
                                 // ローリングモデルを非表示にして、元のモデルを表示
