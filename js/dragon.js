@@ -42,7 +42,7 @@ export function updateDragon(gameState) {
         // 炎攻撃設定の初期化
         gameState.dragonFlameTargetPlayer = true; // デフォルトでプレイヤーを狙う
         gameState.dragonFlameMaxCooldown = 180; // クールダウン時間を延長（60→180フレーム）
-        gameState.dragonFlameCooldown = 0; // 初期クールダウンを0に設定して早めに攻撃
+        gameState.dragonFlameCooldown = 300; // ゲーム開始5秒後（60fps×5秒=300フレーム）に攻撃開始
         gameState.dragonFlameChance = 0.05; // 炎を吹き出す確率を低下（0.2→0.05）
         gameState.dragonFlameGroundTarget = true; // 地面を狙うフラグ
         gameState.dragonFlameTargetPlayerPosition = true; // プレイヤー位置を狙うフラグ
@@ -179,8 +179,13 @@ export function updateDragon(gameState) {
         const distanceMultiplier = Math.max(0.5, Math.min(2.0, 30 / distanceToPlayer));
         const adjustedFlameChance = gameState.dragonFlameChance * distanceMultiplier;
         
+        // ゲーム開始5秒後は必ず1回攻撃する
+        const shouldAttackAfter5Seconds = gameState.gameStartTime && 
+            (Date.now() - gameState.gameStartTime >= 5000) && 
+            gameState.dragonFlameCooldown <= 0;
+        
         // より積極的に攻撃を行う
-        if (Math.random() < adjustedFlameChance || distanceToPlayer < 10) {
+        if (shouldAttackAfter5Seconds || Math.random() < adjustedFlameChance || distanceToPlayer < 10) {
             // プレイヤーの現在位置を狙う
             const targetPosition = gameState.playerPosition.clone();
             

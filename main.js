@@ -66,6 +66,7 @@ const gameState = {
     cinematicDistance: 10, // シネマティックカメラの距離（近づけた）
     cinematicHeight: 5, // シネマティックカメラの高さ（低くした）
     cinematicSpeed: 0.002, // シネマティックカメラの回転速度（少し速く）
+    gameStartTime: null, // ゲーム開始時刻を記録
     
     // アニメーション関連
     animations: {}, // アニメーションを保存するオブジェクト
@@ -81,7 +82,7 @@ const gameState = {
     
     // プレイヤーの体力関連
     playerHealth: 100, // 最大体力
-    currentHealth: 50, // 現在の体力（テスト用に50に設定）
+    currentHealth: 100, // 現在の体力（最大値で開始）
     isInvincible: false, // 無敵状態かどうか
     invincibleTime: 60, // 無敵時間（フレーム単位）
     invincibleTimer: 0, // 無敵タイマー
@@ -306,7 +307,7 @@ try {
     // 環境マップのファイルが存在しない可能性があるため、すぐに代替手段を使用
     createDefaultEnvMap(scene, renderer);
 } catch (e) {
-    console.error("環境マップの設定中にエラーが発生しました:", e);
+    // console.error("環境マップの設定中にエラーが発生しました:", e);
     // エラー時も代替手段を使用
     createDefaultEnvMap(scene, renderer);
 }
@@ -468,13 +469,13 @@ if (loader) {
                     
                     if (child.material) {
                         // マテリアル情報をデバッグ出力
-                        console.log("元のマテリアル情報:", {
-                            type: child.material.type,
-                            color: child.material.color ? child.material.color.getHexString() : 'なし',
-                            metalness: child.material.metalness,
-                            roughness: child.material.roughness,
-                            map: child.material.map ? '存在する' : 'なし'
-                    });
+                        // console.log("元のマテリアル情報:", {
+                        //     type: child.material.type,
+                        //     color: child.material.color ? child.material.color.getHexString() : 'なし',
+                        //     metalness: child.material.metalness,
+                        //     roughness: child.material.roughness,
+                        //     map: child.material.map ? '存在する' : 'なし'
+                        // });
                         
                         // マテリアルを複製して元のマテリアルを保持
                         if (Array.isArray(child.material)) {
@@ -611,22 +612,22 @@ if (loader) {
                                 scene: runGltf.scene
                             };
                             
-                            console.log("走るアニメーションの詳細:", {
-                                type: typeof runAction,
-                                hasStop: typeof runAction.stop === 'function', 
-                                hasReset: typeof runAction.reset === 'function',
-                                hasPlay: typeof runAction.play === 'function'
-                            });
+                            // console.log("走るアニメーションの詳細:", {
+                            //     type: typeof runAction,
+                            //     hasStop: typeof runAction.stop === 'function', 
+                            //     hasReset: typeof runAction.reset === 'function',
+                            //     hasPlay: typeof runAction.play === 'function'
+                            // });
                             
                             // アニメーションの位置変換を調査
                             analyzeAnimation(runGltf.animations[0]);
                             
                             // console.log("走るアニメーションを設定しました");
                         } catch (error) {
-                            console.error("走りアニメーション設定中にエラーが発生しました:", error);
+                            // console.error("走りアニメーション設定中にエラーが発生しました:", error);
                         }
                     } else {
-                        console.error("走りアニメーションが見つかりません");
+                        // console.error("走りアニメーションが見つかりません");
                     }
                 }, 
                 (xhr) => {
@@ -638,36 +639,36 @@ if (loader) {
                 
                 // 攻撃アニメーションを読み込む
                 updateLoadingProgress('Loading attack animation...');
-                loader.load('assets/knight/attach.glb', (attachGltf) => {
-                    // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
-                    if (attachGltf.animations && attachGltf.animations.length > 0) {
-                        // 攻撃アニメーションを保存
-                        const attackAction = mixer.clipAction(attachGltf.animations[0]);
-                        // ループしないように設定
-                        attackAction.loop = THREE.LoopOnce;
-                        attackAction.clampWhenFinished = true;
+                // loader.load('assets/knight/attach.glb', (attachGltf) => {
+                //     // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
+                //     if (attachGltf.animations && attachGltf.animations.length > 0) {
+                //         // 攻撃アニメーションを保存
+                //         const attackAction = mixer.clipAction(attachGltf.animations[0]);
+                //         // ループしないように設定
+                //         attackAction.loop = THREE.LoopOnce;
+                //         attackAction.clampWhenFinished = true;
                         
-                        // アニメーションの重み付けを設定
-                        attackAction.setEffectiveWeight(1.0);
+                //         // アニメーションの重み付けを設定
+                //         attackAction.setEffectiveWeight(1.0);
                         
-                        // アニメーションを保存
-                        playerAnimations['attack'] = attackAction;
-                        gameState.animations.attack = attackAction;
+                //         // アニメーションを保存
+                //         playerAnimations['attack'] = attackAction;
+                //         gameState.animations.attack = attackAction;
                         
-                        // 攻撃アニメーションの位置変換を調査
-                        analyzeAnimation(attachGltf.animations[0]);
+                //         // 攻撃アニメーションの位置変換を調査
+                //         analyzeAnimation(attachGltf.animations[0]);
                         
-                        // console.log("攻撃アニメーションを正常に設定しました");
-                    } else {
-                        console.error("攻撃アニメーションが見つかりません");
-                    }
-                }, 
-                (xhr) => {
-                    // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー攻撃モデル読み込み中...');
-                },
-                (error) => {
-                    console.error('プレイヤー攻撃モデル読み込みエラー:', error);
-                });
+                //         // console.log("攻撃アニメーションを正常に設定しました");
+                //     } else {
+                //         console.error("攻撃アニメーションが見つかりません");
+                //     }
+                // }, 
+                // (xhr) => {
+                //     // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー攻撃モデル読み込み中...');
+                // },
+                // (error) => {
+                //     console.error('プレイヤー攻撃モデル読み込みエラー:', error);
+                // });
                 
                 // ローリングアニメーションを読み込む
                 loader.load('assets/knight/rolling.glb', (rollingGltf) => {
@@ -753,7 +754,9 @@ if (loader) {
                                     if (typeof currentAnimation.stop === 'function') {
                                         currentAnimation.stop();
                                     }
-                                    currentAnimation = playerAnimations['run'].action;
+                                    if (playerAnimations['run'] && playerAnimations['run'].action) {
+                                        currentAnimation = playerAnimations['run'].action;
+                                    }
                                     if (typeof currentAnimation.reset === 'function') {
                                         currentAnimation.reset();
                                     }
@@ -804,30 +807,30 @@ if (loader) {
             }
 
             // ジャンプアニメーションを読み込む
-            loader.load('assets/knight/jump.glb', (jumpGltf) => {
-                // console.log("プレイヤージャンプモデル読み込み成功:", jumpGltf);
-                if (jumpGltf.animations && jumpGltf.animations.length > 0) {
-                    // ジャンプアニメーションを保存
-                    jumpAction = mixer.clipAction(jumpGltf.animations[0]);
-                    // ループしないように設定
-                    jumpAction.loop = THREE.LoopOnce;
-                    jumpAction.clampWhenFinished = true;
+            // loader.load('assets/knight/jump.glb', (jumpGltf) => {
+            //     // console.log("プレイヤージャンプモデル読み込み成功:", jumpGltf);
+            //     if (jumpGltf.animations && jumpGltf.animations.length > 0) {
+            //         // ジャンプアニメーションを保存
+            //         jumpAction = mixer.clipAction(jumpGltf.animations[0]);
+            //         // ループしないように設定
+            //         jumpAction.loop = THREE.LoopOnce;
+            //         jumpAction.clampWhenFinished = true;
                     
-                    // アニメーションの重み付けを設定
-                    jumpAction.setEffectiveWeight(1.0);
+            //         // アニメーションの重み付けを設定
+            //         jumpAction.setEffectiveWeight(1.0);
                     
-                    playerAnimations['jump'] = jumpAction;
+            //         playerAnimations['jump'] = jumpAction;
                     
-                    // ジャンプアニメーションの位置変換を調査
-                    analyzeAnimation(jumpGltf.animations[0]);
-                }
-            }, 
-            (xhr) => {
-                // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤージャンプモデル読み込み中...');
-            },
-            (error) => {
-                console.error('プレイヤージャンプモデル読み込みエラー:', error);
-            });
+            //         // ジャンプアニメーションの位置変換を調査
+            //         analyzeAnimation(jumpGltf.animations[0]);
+            //     }
+            // }, 
+            // (xhr) => {
+            //     // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤージャンプモデル読み込み中...');
+            // },
+            // (error) => {
+            //     console.error('プレイヤージャンプモデル読み込みエラー:', error);
+            // });
 
             // ドラゴンモデルの読み込み試行
             try {
@@ -1156,7 +1159,7 @@ function initializeAudio() {
                         if (!currentAnimation) return;
                         
                         const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
-                        if (isMoving && playerAnimations['run']) {
+                        if (isMoving && playerAnimations['run'] && playerAnimations['run'].action) {
                             if (typeof currentAnimation.stop === 'function') {
                                 currentAnimation.stop();
                             }
@@ -1432,7 +1435,7 @@ function movePlayer() {
     gameState.isMoving = isMoving;
     
     // プレイヤーモデルの位置と向きを更新
-    if (currentAnimation === playerAnimations['run'].action) {
+    if (playerAnimations['run'] && currentAnimation === playerAnimations['run'].action) {
         // 走りモデルの位置と向きを更新
         const runPosition = gameState.playerPosition.clone();
         runPosition.y = gameState.playerPosition.y; // 実際の高さを使用
@@ -1721,6 +1724,7 @@ function showGameScreen() {
     
     gameState.gameStarted = true;
     gameState.videoPlaying = false;
+    gameState.gameStartTime = Date.now(); // ゲーム開始時刻を記録
     
     // 音声を初期化（初回のみ）
     initializeAudio();
@@ -1729,15 +1733,15 @@ function showGameScreen() {
     setTimeout(() => {
         if (bgmSound && bgmSound.buffer && !bgmSound.isPlaying) {
             bgmSound.play();
-            console.log('BGM再生開始');
+            // console.log('BGM再生開始');
         }
         if (windSound && windSound.buffer && !windSound.isPlaying) {
             windSound.play();
-            console.log('環境音再生開始');
+            // console.log('環境音再生開始');
         }
     }, 500); // 少し遅延させて確実に初期化後に再生
     
-    console.log('ゲーム画面を表示しました');
+    // console.log('ゲーム画面を表示しました');
 }
 
 // ローディング進行状況を更新する関数
@@ -1750,7 +1754,7 @@ function updateLoadingProgress(message) {
 
 // ローディング完了時にスタートボタンを表示する関数
 function onLoadingComplete() {
-    console.log('ローディング完了');
+    // console.log('ローディング完了');
     
     // STARTボタンを表示・有効化
     const startButton = document.getElementById('startButton');
@@ -1768,7 +1772,7 @@ function onLoadingComplete() {
     
     // ここでは自動でゲーム画面を表示しない
     // ユーザーがSTARTボタンを押すまで待機
-    console.log('STARTボタンが有効になりました。ユーザーの操作を待機中...');
+    // console.log('STARTボタンが有効になりました。ユーザーの操作を待機中...');
 }
 
 // ページ読み込み完了時の初期化
@@ -1793,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // ビデオ終了時の処理
             introVideo.addEventListener('ended', function() {
-                console.log('ビデオ再生完了');
+                // console.log('ビデオ再生完了');
                 gameState.videoPlaying = false;
                 if (!gameState.gameStarted) {
                     showGameScreen();
@@ -1802,11 +1806,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // ビデオをクリックしてスキップ可能
             introVideo.addEventListener('click', function() {
-                console.log('ビデオスキップ');
+                // console.log('ビデオスキップ');
                 introVideo.pause();
                 gameState.videoPlaying = false;
                 if (!gameState.gameStarted) {
-                    showGameScreen();
+                    // 少し遅延を入れてから画面遷移（スムーズな切り替えのため）
+                    setTimeout(() => {
+                        showGameScreen();
+                    }, 100);
                 }
             });
         }
@@ -1828,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setupVideoEvents();
             
             introVideo.play().then(() => {
-                console.log('ビデオ再生開始');
+                // console.log('ビデオ再生開始');
             }).catch((error) => {
                 console.error('ビデオ再生エラー:', error);
                 // ビデオ再生に失敗した場合は直接ゲーム開始

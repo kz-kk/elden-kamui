@@ -28,13 +28,13 @@ export function addGrass(scene, gameState) {
     const grassTexturePath = 'assets/area/grass.png';
     let grassTexture = null;
     
-    console.log(`草のテクスチャ読み込み開始: ${grassTexturePath}`);
+    // console.log(`草のテクスチャ読み込み開始: ${grassTexturePath}`);
     
     // テクスチャの読み込み
     textureLoader.load(
         grassTexturePath,
         function(texture) {
-            console.log(`テクスチャ読み込み成功: ${grassTexturePath}`);
+            // console.log(`テクスチャ読み込み成功: ${grassTexturePath}`);
             grassTexture = texture;
             createGrassWithTexture();
         },
@@ -42,7 +42,7 @@ export function addGrass(scene, gameState) {
             // 進捗状況（オプション）
             if (xhr.lengthComputable) {
                 const percentComplete = xhr.loaded / xhr.total * 100;
-                console.log(`テクスチャ読み込み進捗: ${Math.round(percentComplete)}%`);
+                // console.log(`テクスチャ読み込み進捗: ${Math.round(percentComplete)}%`);
             }
         },
         function(error) {
@@ -149,7 +149,7 @@ export function addGrass(scene, gameState) {
             // 草をバッチ処理で生成する関数
             function createGrassBatch() {
                 if (processed >= grassCount) {
-                    console.log(`合計${processed}本の草を生成しました`);
+                    // console.log(`合計${processed}本の草を生成しました`);
                     return;
                 }
                 
@@ -263,7 +263,7 @@ export function addGrass(scene, gameState) {
             // 草の生成開始
             createGrassBatch();
             
-            console.log(`${grassCount}本の草の生成を開始しました...`);
+            // console.log(`${grassCount}本の草の生成を開始しました...`);
         } else {
             // 従来のスプライトベースの草を使用する場合（既存のコード）
             // スプライト用のマテリアル（共通設定）
@@ -285,7 +285,7 @@ export function addGrass(scene, gameState) {
             // 草をバッチ処理で生成する関数
             function createGrassBatch() {
                 if (processed >= grassCount) {
-                    console.log(`合計${processed}本の草を生成しました`);
+                    // console.log(`合計${processed}本の草を生成しました`);
                     return;
                 }
                 
@@ -435,7 +435,7 @@ export function addRocks(scene, gameState) {
             // 岩をバッチ処理で生成する関数
             function createRockBatch() {
                 if (processed >= rockCount) {
-                    console.log(`合計${processed}個の岩を配置しました`);
+                    // console.log(`合計${processed}個の岩を配置しました`);
                     return;
                 }
                 
@@ -465,7 +465,8 @@ export function addRocks(scene, gameState) {
                     // 10%の確率で大きな岩を生成
                     if (Math.random() < 0.1) {
                         sizeScale = 4.0 + Math.random() * 2.0; // 4.0〜6.0の大型岩
-                        console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
+                        // console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
+                        // console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
                     } else {
                         sizeScale = 1.5 + Math.random() * 2.0; // 1.5〜3.5の通常岩
                     }
@@ -533,13 +534,13 @@ export function addRocks(scene, gameState) {
             // 岩の生成開始
             createRockBatch();
             
-            console.log(`${rockCount}個の岩の配置を開始しました...`);
+            // console.log(`${rockCount}個の岩の配置を開始しました...`);
         },
         function(xhr) {
             // 進捗状況（オプション）
             if (xhr.lengthComputable) {
                 const percentComplete = xhr.loaded / xhr.total * 100;
-                console.log(`岩のモデル読み込み進捗: ${Math.round(percentComplete)}%`);
+                // console.log(`岩のモデル読み込み進捗: ${Math.round(percentComplete)}%`);
             }
         },
         function(error) {
@@ -595,7 +596,7 @@ export function addRocks(scene, gameState) {
                     // 岩をバッチ処理で生成する関数
                     function createRockBatch() {
                         if (processed >= rockCount) {
-                            console.log(`合計${processed}個の岩を配置しました`);
+                            // console.log(`合計${processed}個の岩を配置しました`);
                             return;
                         }
                         

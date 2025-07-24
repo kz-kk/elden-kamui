@@ -156,7 +156,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            background: url('assets/images/splash_pc.png') center center / contain no-repeat #000;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -164,15 +164,28 @@
             z-index: 1000;
         }
         
+        #startScreen::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: -1;
+        }
+        
         #startTitle {
             font-family: "Times New Roman", serif;
             font-size: 72px;
             font-weight: bold;
             color: #d4af37;
-            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+            text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.9), 2px 2px 4px rgba(0, 0, 0, 0.8);
             margin-bottom: 50px;
             letter-spacing: 8px;
             text-align: center;
+            z-index: 10;
+            position: relative;
         }
         
         #startButton {
@@ -186,8 +199,10 @@
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
             letter-spacing: 4px;
+            z-index: 10;
+            position: relative;
         }
         
         #startButton:hover:not(:disabled) {
@@ -214,7 +229,9 @@
             font-family: "Times New Roman", serif;
             font-size: 18px;
             color: #d4af37;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9), 1px 1px 3px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+            position: relative;
         }
         
         /* 動画のスタイル */
@@ -227,22 +244,77 @@
             object-fit: cover;
             z-index: 999;
         }
+        
+        /* スキップヒントのスタイル */
+        #skipHint {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: "Arial", sans-serif;
+            font-size: 16px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            pointer-events: none;
+            animation: fadeIn 1s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        /* 下部配置用のコンテナ */
+        #bottomControls {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .spacer {
+            flex: 1;
+        }
+        
+        /* モバイル対応 - 968px以下でsplash_spに切り替え */
+        @media screen and (max-width: 968px) {
+            #startScreen {
+                background-image: url('assets/images/splash_sp.png');
+            }
+            
+            #bottomControls {
+                bottom: 60px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="info" style="opacity:0;">矢印キー: 移動 | 左右: 回転 | 上下: 前後移動 | C: カメラ切替（追随⇔遠景） | G: 攻撃 | R: 回避 | F: ビーム</div>
+    <div id="info" style="opacity:0;">矢印キー: 移動 | 左右: 回転 | 上下: 前後移動 | C: カメラ切替（追随⇔遠景）| R: 回避 | F: ビーム</div>
     
     <!-- スタート画面 -->
     <div id="startScreen">
-        <div id="startTitle">ELDEN KAMUI</div>
-        <button id="startButton" style="display: none;">START</button>
-        <div id="loadingText">Loading...</div>
+        <div class="spacer"></div>
+        <div id="bottomControls">
+            <button id="startButton" style="display: none;">START</button>
+            <div id="loadingText">Loading...</div>
+        </div>
     </div>
     
     <!-- 動画要素 -->
     <video id="introVideo" style="display: none;">
         <source src="assets/video/v1.mp4" type="video/mp4">
     </video>
+    
+    <!-- 動画スキップのヒント -->
+    <div id="skipHint" style="display: none;">クリックでスキップ</div>
     
     <div id="loading" style="display: none;">ロード中...</div>
     
