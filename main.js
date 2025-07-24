@@ -181,7 +181,7 @@ const gameState = {
     yellowParticleSize: 0.05, // サイズを調整
     yellowParticleLifetime: 180, // 寿命を調整
     yellowParticleSpawnInterval: 150, // 生成間隔を短くする
-    yellowParticleColumns: 15, // 一度に生成する柱の数を大幅に増やす
+    yellowParticleColumns: 4, // 魔法陣の数に合わせて4本に減らす
     yellowParticleHeight: 5.0, // 柱の高さを調整
     yellowParticleMinCount: 20, // 画面上に常に存在する最小の柱の数を増やす
     yellowParticlePermanentColumn: true, // ドラゴン付近に常に存在する柱を設定
@@ -1485,9 +1485,9 @@ function movePlayer() {
                     currentAnimation.play();
                 }
                 
-                console.log("走りモデルの位置:", 
-                    playerAnimations['run'].scene ? playerAnimations['run'].scene.position.toArray() : "シーンなし"
-                );
+                // console.log("走りモデルの位置:", 
+                //     playerAnimations['run'].scene ? playerAnimations['run'].scene.position.toArray() : "シーンなし"
+                // );
                 // console.log("プレイヤーの位置:", gameState.playerPosition.toArray());
             }
             
@@ -1618,13 +1618,20 @@ function animate() {
         }
         
         if (gameState.currentHealth < gameState.playerHealth && isInHealingArea) {
-            // 魔法陣エリア内では毎フレーム回復
-            const oldHealth = gameState.currentHealth;
-            gameState.currentHealth += 2;
-            if (gameState.currentHealth > gameState.playerHealth) {
-                gameState.currentHealth = gameState.playerHealth;
+            // 魔法陣エリア内では一定間隔で回復
+            gameState.healingTimer--;
+            if (gameState.healingTimer <= 0) {
+                const oldHealth = gameState.currentHealth;
+                gameState.currentHealth += gameState.healingAmount;
+                if (gameState.currentHealth > gameState.playerHealth) {
+                    gameState.currentHealth = gameState.playerHealth;
+                }
+                gameState.healingTimer = gameState.healingInterval; // タイマーをリセット
+                // console.log(`体力回復: ${oldHealth} → ${gameState.currentHealth}`);
             }
-            // console.log(`体力回復: ${oldHealth} → ${gameState.currentHealth}`);
+        } else {
+            // エリア外では回復タイマーをリセット
+            gameState.healingTimer = gameState.healingInterval;
         }
         
         // 無敵時間の更新
@@ -1678,12 +1685,12 @@ camera.lookAt(new THREE.Vector3(0, -3.5, 0)); // キャラクターの頭部あ�
 animate();
 
 // ゲーム初期化後、最初の柱エフェクトを生成
-for (let i = 0; i < 5; i++) { // 初期状態で5本の柱を生成
+for (let i = 0; i < 4; i++) { // 初期状態で4本の柱を生成（回復エリア用）
     createParticleColumn(gameState, scene);
 }
 
 // 黄色いパーティクルエフェクト（魔法陣）を生成
-createYellowParticleEffect(gameState, scene);
+// createYellowParticleEffect(gameState, scene);
 
 // リスタートボタンのセットアップ
 setupRestartButton(gameState, scene);

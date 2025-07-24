@@ -90,12 +90,12 @@ export function updateAllEffects(gameState, scene) {
     // 霧エフェクトの更新
     updateFogEffects(gameState, scene);
 
-    // 粒子の柱エフェクトの生成タイミング管理
-    gameState.columnSpawnTimer++;
-    if (gameState.columnSpawnTimer > gameState.columnSpawnInterval) {
-        createParticleColumn(gameState, scene);
-        gameState.columnSpawnTimer = 0;
-    }
+    // 粒子の柱エフェクトの生成タイミング管理（無効化）
+    // gameState.columnSpawnTimer++;
+    // if (gameState.columnSpawnTimer > gameState.columnSpawnInterval) {
+    //     createParticleColumn(gameState, scene);
+    //     gameState.columnSpawnTimer = 0;
+    // }
 
     // 粒子の柱エフェクトを更新
     for (let i = gameState.particleColumnEffects.length - 1; i >= 0; i--) {

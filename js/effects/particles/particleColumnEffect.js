@@ -73,12 +73,19 @@ function createMagicCircleTexture() {
  * @returns {Object} 生成された柱エフェクトオブジェクト
  */
 export function createParticleColumn(gameState, scene) {
-    // ランダムな位置を選択
-    const columnOrigin = new THREE.Vector3(
-        (Math.random() - 0.5) * 70,
-        gameState.groundLevel,  // 地面レベルに配置
-        (Math.random() - 0.5) * 70
-    );
+    // 固定位置に配置（4つの回復エリア）
+    if (!gameState.healingPositions) {
+        gameState.healingPositions = [
+            new THREE.Vector3(10, gameState.groundLevel, 0),   // area1
+            new THREE.Vector3(-10, gameState.groundLevel, 0),  // area2
+            new THREE.Vector3(0, gameState.groundLevel, 10),   // area3
+            new THREE.Vector3(0, gameState.groundLevel, -10)   // area4
+        ];
+        gameState.currentHealingIndex = 0;
+    }
+    
+    const columnOrigin = gameState.healingPositions[gameState.currentHealingIndex].clone();
+    gameState.currentHealingIndex = (gameState.currentHealingIndex + 1) % 4;
     
     // 魔法陣を生成
     const magicCircleTexture = createMagicCircleTexture();

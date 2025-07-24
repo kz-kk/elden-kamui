@@ -7,10 +7,17 @@ import * as THREE from 'three';
  * @returns {void}
  */
 export function createYellowParticleEffect(gameState, scene) {
-    // yellowParticleEffects配列を初期化（まだない場合）
-    if (!gameState.yellowParticleEffects) {
-        gameState.yellowParticleEffects = [];
+    // 既存のエフェクトをクリア
+    if (gameState.yellowParticleEffects) {
+        gameState.yellowParticleEffects.forEach(effect => {
+            if (effect.particles) {
+                scene.remove(effect.particles);
+                effect.geometry.dispose();
+                effect.material.dispose();
+            }
+        });
     }
+    gameState.yellowParticleEffects = [];
     
     // ドラゴンの位置を取得（安全に）
     let dragonPosition;
@@ -27,22 +34,23 @@ export function createYellowParticleEffect(gameState, scene) {
         let particleOrigin;
         let columnHeight = 1000; // より自然な高さに調整
         
-        if (column < 8 && gameState.dragonModel) {
-            // ドラゴンの周囲に配置（8本）
-            const angle = (column / 8) * Math.PI * 2;
-            const distance = 5 + (column % 4) * 5;
-            
-            particleOrigin = new THREE.Vector3(
-                dragonPosition.x + Math.cos(angle) * distance,
-                gameState.groundLevel,
-                dragonPosition.z + Math.sin(angle) * distance
-            );
-        } else {
-            particleOrigin = new THREE.Vector3(
-                (Math.random() - 0.5) * 100,
-                gameState.groundLevel,
-                (Math.random() - 0.5) * 100
-            );
+        // 4つの魔法陣エリアに対応する位置に配置
+        switch (column) {
+            case 0:
+                particleOrigin = new THREE.Vector3(10, gameState.groundLevel, 0);   // area1
+                break;
+            case 1:
+                particleOrigin = new THREE.Vector3(-10, gameState.groundLevel, 0);  // area2
+                break;
+            case 2:
+                particleOrigin = new THREE.Vector3(0, gameState.groundLevel, 10);   // area3
+                break;
+            case 3:
+                particleOrigin = new THREE.Vector3(0, gameState.groundLevel, -10);  // area4
+                break;
+            default:
+                particleOrigin = new THREE.Vector3(0, gameState.groundLevel, 0);
+                break;
         }
         
         // パーティクルのジオメトリ

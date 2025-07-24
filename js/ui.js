@@ -132,6 +132,26 @@ export function restartGame(gameState, scene) {
     }
     gameState.beamEffects = [];
     
+    // 黄色いパーティクルエフェクトをすべて削除
+    for (let i = gameState.yellowParticleEffects.length - 1; i >= 0; i--) {
+        const yellowEffect = gameState.yellowParticleEffects[i];
+        scene.remove(yellowEffect.particles);
+        yellowEffect.geometry.dispose();
+        yellowEffect.material.dispose();
+    }
+    gameState.yellowParticleEffects = [];
+    
+    // パーティクル柱エフェクトをすべて削除
+    for (let i = gameState.particleColumnEffects.length - 1; i >= 0; i--) {
+        const column = gameState.particleColumnEffects[i];
+        scene.remove(column.particles);
+        scene.remove(column.magicCircle);
+        column.geometry.dispose();
+        column.material.dispose();
+        column.magicCircleMaterial.dispose();
+    }
+    gameState.particleColumnEffects = [];
+    
     // 体力インジケーターを更新
     updateHealthBar(gameState);
     
