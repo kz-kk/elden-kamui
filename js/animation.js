@@ -6,10 +6,10 @@ import * as THREE from 'three';
  * @param {THREE.AnimationClip} animation - 分析するアニメーション
  */
 export function analyzeAnimation(animation) {
-    console.log("アニメーション分析:", animation.name);
+    // console.log("アニメーション分析:", animation.name);
     
     // トラックを確認
     animation.tracks.forEach(track => {
-        console.log("トラック:", track.name);
+        // console.log("トラック:", track.name);
     });
 } 

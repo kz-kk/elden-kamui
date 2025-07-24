@@ -11,6 +11,12 @@ import * as THREE from 'three';
  * @param {HTMLElement} cameraInfo - カメラ情報表示用のHTML要素
  */
 export function toggleCameraMode(gameState, controls, camera, cameraInfo) {
+    // シネマティックモード中はCキーでの切り替えを無効化
+    if (gameState.cinematicCamera) {
+        // console.log("シネマティックモード中はCキーでの切り替えはできません");
+        return;
+    }
+    
     // カメラモードを循環させる: プレイヤー軌道 -> プレイヤー追随（ドラッグ可能） -> 自由カメラ -> プレイヤー軌道...
     if (gameState.orbitPlayerCamera) {
         // プレイヤー軌道カメラからプレイヤー追随カメラ（ドラッグ可能）へ
@@ -113,8 +119,28 @@ export function updateFollowCamera(gameState, camera) {
  */
 export function updateCamera(gameState, controls, camera) {
     // カメラモードに応じた更新
-    if (gameState.followPlayerCamera) {
+    if (gameState.cinematicCamera) {
+        // シネマティックカメラモード
+        // 回転角度を更新
+        gameState.cinematicRotation += gameState.cinematicSpeed;
+        
+        // カメラ位置を計算（プレイヤーを中心に円周上を移動）
+        const x = gameState.playerPosition.x + Math.cos(gameState.cinematicRotation) * gameState.cinematicDistance;
+        const y = gameState.playerPosition.y + gameState.cinematicHeight;
+        const z = gameState.playerPosition.z + Math.sin(gameState.cinematicRotation) * gameState.cinematicDistance;
+        
+        // カメラ位置を設定
+        camera.position.set(x, y, z);
+        
+        // カメラはプレイヤーを注視
+        camera.lookAt(gameState.playerPosition.x, gameState.playerPosition.y + 1, gameState.playerPosition.z);
+        
+        // OrbitControlsのターゲットも更新（念のため）
+        controls.target.copy(gameState.playerPosition);
+        controls.enabled = false; // マウス操作を無効化
+    } else if (gameState.followPlayerCamera) {
         // プレイヤー追随カメラモード（ドラッグ可能）
+        controls.enabled = true;
         // ターゲットはプレイヤーに滑らかに追従
         controls.target.lerp(gameState.playerPosition, 0.1);
         
@@ -122,6 +148,7 @@ export function updateCamera(gameState, controls, camera) {
         updateFollowCameraPosition(gameState, camera);
     } else if (gameState.freeCamera || gameState.orbitPlayerCamera) {
         // 自由カメラモードとプレイヤー軌道カメラモードでは、
+        controls.enabled = true;
         // プレイヤーが移動したらOrbitControlsのターゲットを滑らかに更新
         controls.target.lerp(gameState.playerPosition, 0.05); // より遅い追従
     }

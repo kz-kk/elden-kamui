@@ -7,10 +7,11 @@
 export function updateHealthBar(gameState) {
     const healthPercent = (gameState.currentHealth / gameState.playerHealth) * 100;
     const healthBar = document.getElementById('healthBar');
-    healthBar.style.width = `${healthPercent}%`;
     
-    // 色は常に#9b000fに固定
-    healthBar.style.backgroundColor = '#9b000f';
+    if (healthBar) {
+        healthBar.style.width = `${healthPercent}%`;
+        healthBar.style.backgroundColor = '#9b000f';
+    }
     
     // ダメージを受けた時の点滅効果
     if (gameState.damageFlashTimer > 0) {
@@ -37,28 +38,34 @@ export function updateHealthBar(gameState) {
 export function updateDragonHealthBar(gameState) {
     const healthPercent = (gameState.currentDragonHealth / gameState.dragonHealth) * 100;
     const healthBar = document.getElementById('dragonHealthBar');
-    healthBar.style.width = `${healthPercent}%`;
     
-    // 色は常に#9b000fに固定
-    healthBar.style.backgroundColor = '#9b000f';
-    
-    // ダメージを受けた時の点滅効果
-    if (gameState.dragonDamageFlashTimer > 0) {
-        gameState.dragonDamageFlashTimer--;
+    if (healthBar) {
+        healthBar.style.width = `${healthPercent}%`;
         
-        // 点滅効果（偶数フレームで表示、奇数フレームで非表示）
-        if (gameState.dragonDamageFlashTimer % 2 === 0) {
-            healthBar.style.opacity = '1.0';
+        // 色は常に#9b000fに固定
+        healthBar.style.backgroundColor = '#9b000f';
+        
+        // ダメージを受けた時の点滅効果
+        if (gameState.dragonDamageFlashTimer > 0) {
+            gameState.dragonDamageFlashTimer--;
+            
+            // 点滅効果（偶数フレームで表示、奇数フレームで非表示）
+            if (gameState.dragonDamageFlashTimer % 2 === 0) {
+                healthBar.style.opacity = '1.0';
+            } else {
+                healthBar.style.opacity = '0.5';
+            }
         } else {
-            healthBar.style.opacity = '0.5';
+            healthBar.style.opacity = '1.0';
         }
-    } else {
-        healthBar.style.opacity = '1.0';
     }
     
     // ドラゴンが倒されたら非表示
     if (gameState.isDragonDefeated) {
-        document.getElementById('dragonHealthContainer').style.display = 'none';
+        const dragonContainer = document.getElementById('dragonHealthContainer');
+        if (dragonContainer) {
+            dragonContainer.style.display = 'none';
+        }
     }
 }
 
@@ -73,7 +80,7 @@ export function gameOver(gameState) {
     const gameOverScreen = document.getElementById('gameOverScreen');
     gameOverScreen.style.display = 'flex';
     
-    console.log("ゲームオーバー！");
+    // console.log("ゲームオーバー！");
 }
 
 /**
@@ -128,7 +135,7 @@ export function restartGame(gameState, scene) {
     // 体力インジケーターを更新
     updateHealthBar(gameState);
     
-    console.log("ゲームをリスタートしました");
+    // console.log("ゲームをリスタートしました");
 }
 
 /**

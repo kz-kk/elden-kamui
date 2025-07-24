@@ -484,7 +484,7 @@ export function updateDragonFlameEffects(gameState, scene) {
             flame.geometry.dispose();
             flame.material.dispose();
             gameState.dragonFlameEffects.splice(i, 1);
-            console.log("ドラゴン炎エフェクト消滅");
+            // console.log("ドラゴン炎エフェクト消滅");
         }
     }
 } 

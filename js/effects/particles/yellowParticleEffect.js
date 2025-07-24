@@ -7,6 +7,11 @@ import * as THREE from 'three';
  * @returns {void}
  */
 export function createYellowParticleEffect(gameState, scene) {
+    // yellowParticleEffects配列を初期化（まだない場合）
+    if (!gameState.yellowParticleEffects) {
+        gameState.yellowParticleEffects = [];
+    }
+    
     // ドラゴンの位置を取得（安全に）
     let dragonPosition;
     if (gameState.dragonModel) {

@@ -9,6 +9,9 @@ import * as THREE from 'three';
  */
 export function updateDragon(gameState) {
     if (!gameState.dragonModel || !gameState.playerModel) return;
+    
+    // ドラゴンが撃破されている場合は何もしない
+    if (gameState.isDragonDefeated) return;
 
     // ドラゴンの状態管理の初期化
     if (!gameState.dragonState) {
@@ -232,9 +235,9 @@ export function updateDragon(gameState) {
                 gameState.dragonFlameMaxCooldown * 0.7 : gameState.dragonFlameMaxCooldown;
             gameState.dragonFlameCooldown = Math.floor(baseCooldown * cooldownMultiplier);
             
-            console.log("ドラゴンがプレイヤーの現在位置めがけて炎を吹き出した！", 
-                        "目標位置:", targetPosition.x.toFixed(2), targetPosition.y.toFixed(2), targetPosition.z.toFixed(2),
-                        "距離:", distanceToPlayer.toFixed(2));
+            // console.log("ドラゴンがプレイヤーの現在位置めがけて炎を吹き出した！", 
+            //             "目標位置:", targetPosition.x.toFixed(2), targetPosition.y.toFixed(2), targetPosition.z.toFixed(2),
+            //             "距離:", distanceToPlayer.toFixed(2));
             
             // createDragonFlameEffect関数の呼び出しをmain.jsで行うためのフラグを設定
             gameState.shouldCreateDragonFlame = true;

@@ -97,7 +97,7 @@ export function updateInvincibility(gameState) {
 export function applyDamage(gameState, amount, gameOverCallback) {
     // 体力を減らす
     gameState.currentHealth -= amount;
-    console.log(`ダメージを受けた！ダメージ量: ${amount}, 残り体力: ${gameState.currentHealth}`);
+    // console.log(`ダメージを受けた！ダメージ量: ${amount}, 残り体力: ${gameState.currentHealth}`);
     
     // 体力が0以下になったらゲームオーバー
     if (gameState.currentHealth <= 0) {
@@ -123,6 +123,62 @@ export function applyDamage(gameState, amount, gameOverCallback) {
 }
 
 /**
+ * プレイヤーの体力を回復する関数
+ * @param {Object} gameState - ゲームの状態オブジェクト
+ * @param {number} amount - 回復量
+ */
+export function healPlayer(gameState, amount) {
+    // 体力が満タンの場合は回復しない
+    if (gameState.currentHealth >= gameState.playerHealth) return;
+    
+    // 体力を回復
+    gameState.currentHealth = Math.min(gameState.currentHealth + amount, gameState.playerHealth);
+    
+    // 体力インジケーターを即座に更新
+    const healthPercent = (gameState.currentHealth / gameState.playerHealth) * 100;
+    const healthBar = document.getElementById('healthBar');
+    if (healthBar) {
+        healthBar.style.transition = 'none';
+        healthBar.style.width = `${healthPercent}%`;
+    }
+}
+
+export function checkYellowParticleHealing(gameState) {
+    // 魔法陣エリア（常に存在する固定位置）
+    const magicAreas = [
+        { x: 10, z: 0 },
+        { x: -10, z: 0 },
+        { x: 0, z: 10 },
+        { x: 0, z: -10 }
+    ];
+    
+    const range = 3.0;
+    
+    for (const area of magicAreas) {
+        const dx = gameState.playerPosition.x - area.x;
+        const dz = gameState.playerPosition.z - area.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        
+        if (distance <= range && gameState.currentHealth < gameState.playerHealth) {
+            gameState.currentHealth += 1.5; // 適度な回復量
+            if (gameState.currentHealth > gameState.playerHealth) {
+                gameState.currentHealth = gameState.playerHealth;
+            }
+            
+            // 体力バーを即座に更新
+            const healthPercent = (gameState.currentHealth / gameState.playerHealth) * 100;
+            const healthBar = document.getElementById('healthBar');
+            if (healthBar) {
+                healthBar.style.transition = 'none';
+                healthBar.style.width = `${healthPercent}%`;
+                healthBar.style.backgroundColor = '#9b000f';
+            }
+            return;
+        }
+    }
+}
+
+/**
  * ドラゴンにダメージを適用する関数
  * @param {Object} gameState - ゲームの状態オブジェクト
  * @param {number} amount - ダメージ量
@@ -133,7 +189,7 @@ export function applyDragonDamage(gameState, amount) {
     
     // 体力を減らす
     gameState.currentDragonHealth -= amount;
-    console.log(`ドラゴンにダメージを与えた！ダメージ量: ${amount}, 残り体力: ${gameState.currentDragonHealth}`);
+    // console.log(`ドラゴンにダメージを与えた！ダメージ量: ${amount}, 残り体力: ${gameState.currentDragonHealth}`);
     
     // 体力が0以下になったらドラゴン撃破
     if (gameState.currentDragonHealth <= 0) {
@@ -146,7 +202,7 @@ export function applyDragonDamage(gameState, amount) {
             gameState.dragonModel.visible = false;
         }
         
-        console.log("ドラゴンを撃破した！");
+        // console.log("ドラゴンを撃破した！");
         return;
     }
     

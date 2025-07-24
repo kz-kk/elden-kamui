@@ -8,8 +8,9 @@ import { gameOver } from './ui.js';
 /**
  * ゲーム内の衝突判定を行う関数
  * @param {Object} gameState - ゲームの状態オブジェクト
+ * @param {boolean} isRollingAnimationPlaying - ローリングアニメーション再生中かどうか
  */
-export function checkCollisions(gameState) {
+export function checkCollisions(gameState, isRollingAnimationPlaying) {
     // プレイヤーの位置と当たり判定の半径を定義
     const playerPos = new THREE.Vector3(
         gameState.playerPosition.x,
@@ -46,7 +47,7 @@ export function checkCollisions(gameState) {
                         gameState.isJumping = false;
                         gameState.verticalVelocity = 0;
                         gameState.isOnRock = true; // 岩の上にいることを記録
-                        console.log("岩に着地しました"); // デバッグログを追加
+                        // console.log("岩に着地しました"); // デバッグログを追加
                     }
                 } else {
                     // プレイヤーが岩の下または側面にいる場合、押し戻す
@@ -177,8 +178,11 @@ export function checkCollisions(gameState) {
     }
     */
     
-    // 無敵状態ならプレイヤーの衝突判定をスキップ
-    if (gameState.isInvincible) return;
+    // 無敵状態またはローリング中ならプレイヤーの衝突判定をスキップ
+    if (gameState.isInvincible || gameState.isRolling || isRollingAnimationPlaying) {
+        // console.log("無敵状態: ", gameState.isInvincible, "ローリング中: ", gameState.isRolling, "ローリングアニメーション中: ", isRollingAnimationPlaying);
+        return;
+    }
     
     // 地面の炎とプレイヤーの衝突判定（岩の上にいない場合のみ）
     if (!gameState.isOnRock) {
@@ -231,7 +235,7 @@ export function checkCollisions(gameState) {
                     
                     // 衝突判定
                     if (horizontalDistance < playerRadius + groundFlameRadius) {
-                        console.log(`地面の炎との衝突を検出！距離: ${horizontalDistance.toFixed(2)}`);
+                        // console.log(`地面の炎との衝突を検出！距離: ${horizontalDistance.toFixed(2)}`);
                         
                         // ダメージを与える
                         applyDamage(gameState, gameState.groundFireDamage || 10, gameOver);
@@ -285,7 +289,7 @@ export function checkCollisions(gameState) {
                 
                 // 衝突判定（距離がプレイヤーの半径 + パーティクルサイズより小さい場合）
                 if (distance < playerRadius + (gameState.dragonFlameSize || 1.0)) {
-                    console.log(`空中の炎との衝突を検出！距離: ${distance.toFixed(2)}`);
+                    // console.log(`空中の炎との衝突を検出！距離: ${distance.toFixed(2)}`);
                     
                     // ダメージを与える
                     applyDamage(gameState, 15, gameOver); // 空中の炎は少し強いダメージ

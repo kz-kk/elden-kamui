@@ -429,7 +429,7 @@ export function createBeamEffect(gameState, scene) {
                     
                     // 衝突判定
                     if (distance < dragonRadius + scales[i]) {
-                        console.log(`ビームとドラゴンの衝突を検出！距離: ${distance.toFixed(2)}`);
+                        // console.log(`ビームとドラゴンの衝突を検出！距離: ${distance.toFixed(2)}`);
                         
                         // 衝突フラグを立てる
                         this.hasCollided = true;
@@ -438,7 +438,7 @@ export function createBeamEffect(gameState, scene) {
                         // ドラゴンにダメージを与える
                         if (!gameState.isDragonInvincible) {
                             gameState.currentDragonHealth -= 20;
-                            console.log(`ドラゴンにダメージを与えた！ダメージ量: 20（強化）, 残り体力: ${gameState.currentDragonHealth}`);
+                            // console.log(`ドラゴンにダメージを与えた！ダメージ量: 20（強化）, 残り体力: ${gameState.currentDragonHealth}`);
                             
                             // 体力が0以下になったらドラゴン撃破
                             if (gameState.currentDragonHealth <= 0) {
@@ -451,7 +451,7 @@ export function createBeamEffect(gameState, scene) {
                                     gameState.dragonModel.visible = false;
                                 }
                                 
-                                console.log("ドラゴンを撃破した！");
+                                // console.log("ドラゴンを撃破した！");
                             } else {
                                 // 無敵状態にする
                                 gameState.isDragonInvincible = true;
@@ -576,7 +576,7 @@ export function updateBeamEffects(gameState, scene) {
             beam.geometry.dispose();
             beam.material.dispose();
             gameState.beamEffects.splice(i, 1);
-            console.log("ビームエフェクト消滅");
+            // console.log("ビームエフェクト消滅");
         }
     }
     
@@ -594,7 +594,7 @@ export function updateBeamEffects(gameState, scene) {
                 explosion.geometry.dispose();
                 explosion.material.dispose();
                 gameState.explosionEffects.splice(i, 1);
-                console.log("爆発エフェクト消滅");
+                // console.log("爆発エフェクト消滅");
             }
         }
     }

@@ -44,7 +44,7 @@ export function updateAllEffects(gameState, scene) {
             flame.geometry.dispose();
             flame.material.dispose();
             gameState.flameEffects.splice(i, 1);
-            console.log("炎エフェクト消滅");
+            // console.log("炎エフェクト消滅");
         }
     }
     
@@ -61,7 +61,7 @@ export function updateAllEffects(gameState, scene) {
             groundFire.geometry.dispose();
             groundFire.material.dispose();
             gameState.groundFireEffects.splice(i, 1);
-            console.log("地面の炎エフェクト消滅");
+            // console.log("地面の炎エフェクト消滅");
         }
     }
     
@@ -108,7 +108,17 @@ export function updateAllEffects(gameState, scene) {
             column.geometry.dispose();
             column.material.dispose();
             gameState.particleColumnEffects.splice(i, 1);
-            console.log("粒子の柱エフェクト消滅");
+            // console.log("粒子の柱エフェクト消滅");
+        }
+    }
+
+    // 黄色いパーティクルエフェクトを更新
+    for (let i = gameState.yellowParticleEffects.length - 1; i >= 0; i--) {
+        const yellowEffect = gameState.yellowParticleEffects[i];
+        
+        // パーティクル位置を更新
+        if (yellowEffect.updatePositions) {
+            yellowEffect.updatePositions();
         }
     }
 } 

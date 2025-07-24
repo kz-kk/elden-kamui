@@ -57,6 +57,11 @@ const gameState = {
     freeCamera: false, // 自由カメラモード
     orbitPlayerCamera: true, // プレイヤー軌道カメラモード
     followPlayerCamera: false, // プレイヤー追随カメラモード（ドラッグ可能）
+    cinematicCamera: false, // シネマティックカメラモード
+    cinematicRotation: 0, // シネマティックカメラの回転角度
+    cinematicDistance: 10, // シネマティックカメラの距離（近づけた）
+    cinematicHeight: 5, // シネマティックカメラの高さ（低くした）
+    cinematicSpeed: 0.002, // シネマティックカメラの回転速度（少し速く）
     
     // アニメーション関連
     animations: {}, // アニメーションを保存するオブジェクト
@@ -72,7 +77,7 @@ const gameState = {
     
     // プレイヤーの体力関連
     playerHealth: 100, // 最大体力
-    currentHealth: 100, // 現在の体力
+    currentHealth: 50, // 現在の体力（テスト用に50に設定）
     isInvincible: false, // 無敵状態かどうか
     invincibleTime: 60, // 無敵時間（フレーム単位）
     invincibleTimer: 0, // 無敵タイマー
@@ -191,6 +196,11 @@ const gameState = {
     groundFireDamage: 5, // 地面の炎のダメージ量
     shouldCreateDragonFlame: false, // ドラゴンの炎エフェクト生成フラグ
     isOnRock: false, // 岩の上にいるかどうか
+    
+    // 体力回復関連のパラメータ
+    healingTimer: 30, // 体力回復のタイマー（初期値を間隔と同じに設定）
+    healingInterval: 30, // 体力回復の間隔（フレーム単位）
+    healingAmount: 1, // 1回の回復量
 };
 
 // シーン、カメラ、レンダラーの設定
@@ -218,6 +228,32 @@ gameState.orbitPlayerCamera = true; // プレイヤー中心の軌道カメラ�
 
 // UI情報の表示の更新
 document.getElementById('info').innerHTML = '矢印キー: 移動 | 左右: 回転 | 上下: 前後移動 | スペース: ジャンプ | C: カメラモード切替 | マウスドラッグ: カメラ回転 | ホイール: ズーム';
+
+// カメラボタンのイベントリスナー
+const cameraButton = document.getElementById('cameraButton');
+cameraButton.addEventListener('click', () => {
+    // シネマティックモードのオン/オフを切り替え
+    gameState.cinematicCamera = !gameState.cinematicCamera;
+    
+    if (gameState.cinematicCamera) {
+        // シネマティックモードをオンにする
+        gameState.freeCamera = false;
+        gameState.orbitPlayerCamera = false;
+        gameState.followPlayerCamera = false;
+        cameraButton.classList.add('active');
+        
+        // カメラの初期位置を設定
+        gameState.cinematicRotation = 0;
+        
+        // console.log("シネマティックカメラモード: ON");
+    } else {
+        // 通常のカメラモードに戻す
+        gameState.orbitPlayerCamera = true;
+        cameraButton.classList.remove('active');
+        
+        // console.log("シネマティックカメラモード: OFF");
+    }
+});
 
 // UI情報の表示
 const cameraInfo = document.createElement('div');
@@ -262,7 +298,7 @@ scene.add(hemisphereLight);
 
 // 環境マップの設定（金属の反射に使用）
 try {
-    console.log("環境マップの読み込みを試みます...");
+    // console.log("環境マップの読み込みを試みます...");
     // 環境マップのファイルが存在しない可能性があるため、すぐに代替手段を使用
     createDefaultEnvMap(scene, renderer);
 } catch (e) {
@@ -393,7 +429,7 @@ let isRollingAnimationPlaying = false; // ローリングアニメーション�
 if (loader) {
     try {
         loader.load('assets/knight/wait.glb', (gltf) => {
-            console.log("プレイヤー待機モデル読み込み成功:", gltf);
+            // console.log("プレイヤー待機モデル読み込み成功:", gltf);
             
             // 仮表示を削除
             scene.remove(playerPlaceholder);
@@ -423,7 +459,7 @@ if (loader) {
                     child.castShadow = true;
                     child.receiveShadow = true;
                     
-                    console.log("戦士モデルのメッシュを処理:", child.name);
+                    // console.log("戦士モデルのメッシュを処理:", child.name);
                     
                     if (child.material) {
                         // マテリアル情報をデバッグ出力
@@ -433,7 +469,7 @@ if (loader) {
                             metalness: child.material.metalness,
                             roughness: child.material.roughness,
                             map: child.material.map ? '存在する' : 'なし'
-                        });
+                    });
                         
                         // マテリアルを複製して元のマテリアルを保持
                         if (Array.isArray(child.material)) {
@@ -483,13 +519,13 @@ if (loader) {
                         }
                         
                         // 更新後のマテリアル情報をデバッグ出力
-                        console.log("更新後のマテリアル情報:", {
-                            type: child.material.type,
-                            color: child.material.color ? child.material.color.getHexString() : 'なし',
-                            metalness: child.material.metalness,
-                            roughness: child.material.roughness,
-                            map: child.material.map ? '存在する' : 'なし'
-                        });
+                        // console.log("更新後のマテリアル情報:", {
+                        //     type: child.material.type,
+                        //     color: child.material.color ? child.material.color.getHexString() : 'なし',
+                        //     metalness: child.material.metalness,
+                        //     roughness: child.material.roughness,
+                        //     map: child.material.map ? '存在する' : 'なし'
+                        // });
                     }
                 }
             });
@@ -508,14 +544,14 @@ if (loader) {
                 
                 // 走るアニメーションを読み込む
                 loader.load('assets/knight/run.glb', (runGltf) => {
-                    console.log("プレイヤー走りモデル読み込み成功:", runGltf);
-                    console.log("走りモデルのアニメーション数:", runGltf.animations ? runGltf.animations.length : 0);
+                    // console.log("プレイヤー走りモデル読み込み成功:", runGltf);
+                    // console.log("走りモデルのアニメーション数:", runGltf.animations ? runGltf.animations.length : 0);
                     
                     if (runGltf.animations && runGltf.animations.length > 0) {
                         try {
                             // アニメーションの詳細情報を出力
-                            console.log("走りアニメーション名:", runGltf.animations[0].name);
-                            console.log("走りアニメーショントラック数:", runGltf.animations[0].tracks.length);
+                            // console.log("走りアニメーション名:", runGltf.animations[0].name);
+                            // console.log("走りアニメーショントラック数:", runGltf.animations[0].tracks.length);
                             
                             // モデルのサイズを設定
                             runGltf.scene.scale.set(2, 2, 2);
@@ -569,7 +605,7 @@ if (loader) {
                                 scene: runGltf.scene
                             };
                             
-                            console.log("走るアニメーションの詳細:", {
+                            // console.log("走るアニメーションの詳細:", {
                                 type: typeof runAction,
                                 hasStop: typeof runAction.stop === 'function', 
                                 hasReset: typeof runAction.reset === 'function',
@@ -579,7 +615,7 @@ if (loader) {
                             // アニメーションの位置変換を調査
                             analyzeAnimation(runGltf.animations[0]);
                             
-                            console.log("走るアニメーションを設定しました");
+                            // console.log("走るアニメーションを設定しました");
                         } catch (error) {
                             console.error("走りアニメーション設定中にエラーが発生しました:", error);
                         }
@@ -588,7 +624,7 @@ if (loader) {
                     }
                 }, 
                 (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー走りモデル読み込み中...');
+                    // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー走りモデル読み込み中...');
                 },
                 (error) => {
                     console.error('プレイヤー走りモデル読み込みエラー:', error);
@@ -596,7 +632,7 @@ if (loader) {
                 
                 // 攻撃アニメーションを読み込む
                 loader.load('assets/knight/attach.glb', (attachGltf) => {
-                    console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
+                    // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
                     if (attachGltf.animations && attachGltf.animations.length > 0) {
                         // 攻撃アニメーションを保存
                         const attackAction = mixer.clipAction(attachGltf.animations[0]);
@@ -614,13 +650,13 @@ if (loader) {
                         // 攻撃アニメーションの位置変換を調査
                         analyzeAnimation(attachGltf.animations[0]);
                         
-                        console.log("攻撃アニメーションを正常に設定しました");
+                        // console.log("攻撃アニメーションを正常に設定しました");
                     } else {
                         console.error("攻撃アニメーションが見つかりません");
                     }
                 }, 
                 (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー攻撃モデル読み込み中...');
+                    // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤー攻撃モデル読み込み中...');
                 },
                 (error) => {
                     console.error('プレイヤー攻撃モデル読み込みエラー:', error);
@@ -628,7 +664,7 @@ if (loader) {
                 
                 // ローリングアニメーションを読み込む
                 loader.load('assets/knight/rolling.glb', (rollingGltf) => {
-                    console.log("プレイヤーローリングモデル読み込み成功:", rollingGltf);
+                    // console.log("プレイヤーローリングモデル読み込み成功:", rollingGltf);
                     if (rollingGltf.animations && rollingGltf.animations.length > 0) {
                         // ローリング専用のモデルとマテリアルを設定
                         rollingGltf.scene.scale.set(2, 2, 2);
@@ -675,7 +711,7 @@ if (loader) {
                         // アニメーション終了時のイベントを設定
                         rollingMixer.addEventListener('finished', function(e) {
                             if (isRollingAnimationPlaying) {
-                                console.log("ローリングアニメーション終了");
+                                // console.log("ローリングアニメーション終了");
                                 
                                 // ローリング中に既に位置更新済みなので、ここでは位置設定不要
                                 // モデル位置のみ同期
@@ -738,7 +774,7 @@ if (loader) {
                                     }
                                 }
                                 
-                                console.log("ローリング最終位置:", gameState.playerPosition);
+                                // console.log("ローリング最終位置:", gameState.playerPosition);
                             }
                         });
                         
@@ -753,7 +789,7 @@ if (loader) {
                     }
                 }, 
                 (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーローリングモデル読み込み中...');
+                    // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーローリングモデル読み込み中...');
                 },
                 (error) => {
                     console.error('プレイヤーローリングモデル読み込みエラー:', error);
@@ -762,7 +798,7 @@ if (loader) {
 
             // ジャンプアニメーションを読み込む
             loader.load('assets/knight/jump.glb', (jumpGltf) => {
-                console.log("プレイヤージャンプモデル読み込み成功:", jumpGltf);
+                // console.log("プレイヤージャンプモデル読み込み成功:", jumpGltf);
                 if (jumpGltf.animations && jumpGltf.animations.length > 0) {
                     // ジャンプアニメーションを保存
                     jumpAction = mixer.clipAction(jumpGltf.animations[0]);
@@ -780,7 +816,7 @@ if (loader) {
                 }
             }, 
             (xhr) => {
-                console.log((xhr.loaded / xhr.total * 100) + '% プレイヤージャンプモデル読み込み中...');
+                // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤージャンプモデル読み込み中...');
             },
             (error) => {
                 console.error('プレイヤージャンプモデル読み込みエラー:', error);
@@ -789,7 +825,7 @@ if (loader) {
             // ドラゴンモデルの読み込み試行
             try {
                 loader.load('assets/dragon/fly.glb', (gltf) => {
-                    console.log("ドラゴンモデル読み込み成功:", gltf);
+                    // console.log("ドラゴンモデル読み込み成功:", gltf);
                     
                     // 仮表示を削除
                     scene.remove(dragonPlaceholder);
@@ -811,7 +847,7 @@ if (loader) {
                             child.castShadow = true;
                             child.receiveShadow = true;
                             
-                            console.log("ドラゴンモデルのメッシュを処理:", child.name);
+                            // console.log("ドラゴンモデルのメッシュを処理:", child.name);
                             
                             if (child.material) {
                                 // マテリアルを複製して元のマテリアルを保持
@@ -867,7 +903,7 @@ if (loader) {
                     }
                 }, 
                 (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% ドラゴンモデル読み込み中...');
+                    // console.log((xhr.loaded / xhr.total * 100) + '% ドラゴンモデル読み込み中...');
                 },
                 (error) => {
                     console.error('ドラゴンモデル読み込みエラー:', error);
@@ -881,7 +917,7 @@ if (loader) {
             document.getElementById('loading').style.display = 'none';
         }, 
         (xhr) => {
-            console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーモデル読み込み中...');
+            // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーモデル読み込み中...');
         },
         (error) => {
             console.error('プレイヤーモデル読み込みエラー:', error);
@@ -937,7 +973,7 @@ try {
                 attackSound.setLoop(false);
                 attackSound.setVolume(0.7);
                 gameState.sounds.attack = attackSound;
-                console.log('攻撃音読み込み成功');
+                // console.log('攻撃音読み込み成功');
             }, null, (error) => {
                 console.error('攻撃音読み込みエラー:', error);
             });
@@ -949,7 +985,7 @@ try {
                 footstepSound.setLoop(false);
                 footstepSound.setVolume(0.5);
                 gameState.sounds.footstep = footstepSound;
-                console.log('足音読み込み成功');
+                // console.log('足音読み込み成功');
             }, null, (error) => {
                 console.error('足音読み込みエラー:', error);
             });
@@ -961,7 +997,7 @@ try {
                 fireSound.setLoop(false);
                 fireSound.setVolume(0.4);
                 gameState.sounds.fire = fireSound;
-                console.log('炎音読み込み成功');
+                // console.log('炎音読み込み成功');
             }, null, (error) => {
                 console.error('炎音読み込みエラー:', error);
             });
@@ -973,7 +1009,7 @@ try {
                 patipatiSound.setLoop(false);
                 patipatiSound.setVolume(0.9);
                 gameState.sounds.patipati = patipatiSound;
-                console.log('パチパチ音読み込み成功');
+                // console.log('パチパチ音読み込み成功');
             }, null, (error) => {
                 console.error('パチパチ音読み込みエラー:', error);
             });
@@ -1003,13 +1039,36 @@ try {
                     // クールダウンをリセット
                     gameState.beamCooldown = gameState.beamMaxCooldown;
                     
-                    console.log("ビームを発射！");
+                    // console.log("ビームを発射！");
+                }
+                
+                // 体力回復テスト用（Hキー）
+                if (e.key === 'h' || e.key === 'H') {
+                    gameState.currentHealth = Math.max(1, gameState.currentHealth - 10);
+                }
+                
+                // 体力回復テスト（Tキー）
+                if (e.key === 't' || e.key === 'T') {
+                    gameState.currentHealth = Math.min(gameState.currentHealth + 10, gameState.playerHealth);
+                }
+                
+                // デバッグ情報表示（Pキー）
+                if (e.key === 'p' || e.key === 'P') {
+                    // console.log('プレイヤー位置:', gameState.playerPosition.x.toFixed(2), gameState.playerPosition.y.toFixed(2), gameState.playerPosition.z.toFixed(2));
+                    if (gameState.yellowParticleEffects) {
+                        // console.log('魔法陣数:', gameState.yellowParticleEffects.length);
+                        gameState.yellowParticleEffects.forEach((effect, i) => {
+                            if (effect && effect.origin) {
+                                // console.log(`魔法陣${i}:`, effect.origin.x.toFixed(2), effect.origin.y.toFixed(2), effect.origin.z.toFixed(2));
+                            }
+                        });
+                    }
                 }
                 
                 // 攻撃処理（Gキー）
                 if ((e.key === 'g' || e.key === 'G') && !gameState.isAttacking && !gameState.isRolling) {
                     gameState.isAttacking = true;
-                    console.log("Gキーによる攻撃を実行");
+                    // console.log("Gキーによる攻撃を実行");
                     
                     // 攻撃アニメーションを再生
                     if (playerAnimations['attack']) {
@@ -1023,7 +1082,7 @@ try {
                         currentAnimation.reset();
                         currentAnimation.play();
                         
-                        console.log("攻撃アニメーション開始");
+                        // console.log("攻撃アニメーション開始");
                     }
                     
                     // 攻撃効果音を再生
@@ -1048,7 +1107,7 @@ try {
                         // 攻撃範囲内にドラゴンがいるかチェック（攻撃範囲を15.0に設定）
                         const attackRange = 15.0;
                         if (distance < attackRange) {
-                            console.log(`剣攻撃がドラゴンに命中！距離: ${distance.toFixed(2)}`);
+                            // console.log(`剣攻撃がドラゴンに命中！距離: ${distance.toFixed(2)}`);
                             
                             // ドラゴンにダメージを与える
                             if (!gameState.isDragonInvincible) {
@@ -1061,7 +1120,7 @@ try {
                     // 攻撃状態のリセット
                     setTimeout(() => {
                         gameState.isAttacking = false;
-                        console.log("攻撃状態をリセット");
+                        // console.log("攻撃状態をリセット");
                         
                         // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
                         if (!currentAnimation) return;
@@ -1106,8 +1165,8 @@ try {
                     // ローリング開始位置を設定（現在の位置から開始）
                     gameState.rollingStartPosition = originalPosition.clone();
                     
-                    console.log("ローリング開始位置:", originalPosition);
-                    console.log("移動方向:", { x: forwardX, z: forwardZ });
+                    // console.log("ローリング開始位置:", originalPosition);
+                    // console.log("移動方向:", { x: forwardX, z: forwardZ });
                     
                     // 既存のアニメーションを停止
                     if (currentAnimation && typeof currentAnimation.stop === 'function') {
@@ -1144,7 +1203,7 @@ try {
                     gameState.isRolling = true;
                     gameState.rollingCooldown = 15; // クールダウン設定（短縮）
                     
-                    console.log("ローリングアニメーション開始 - 向いている方向に移動");
+                    // console.log("ローリングアニメーション開始 - 向いている方向に移動");
                 }
                 
                 // 音楽再生（ユーザーインタラクション後に再生開始）
@@ -1291,7 +1350,7 @@ function movePlayer() {
         if (mixer && jumpAction) {
             jumpAction.reset();
             jumpAction.play();
-            console.log("ジャンプアニメーション再生");
+            // console.log("ジャンプアニメーション再生");
         }
     }
     
@@ -1368,7 +1427,7 @@ function movePlayer() {
              (typeof playerAnimations['run'] === 'object' && playerAnimations['run'].action && 
               currentAnimation !== playerAnimations['run'].action))) {
             // 走りアニメーションに切り替え
-            console.log("走りアニメーションに切り替え");
+            // console.log("走りアニメーションに切り替え");
             
             // 既存のアニメーションを停止
             if (currentAnimation && typeof currentAnimation.stop === 'function') {
@@ -1398,16 +1457,16 @@ function movePlayer() {
                     currentAnimation.play();
                 }
                 
-                console.log("走りモデルの位置:", 
+                // console.log("走りモデルの位置:", 
                     playerAnimations['run'].scene ? playerAnimations['run'].scene.position.toArray() : "シーンなし");
-                console.log("プレイヤーの位置:", gameState.playerPosition.toArray());
+                // console.log("プレイヤーの位置:", gameState.playerPosition.toArray());
             }
             
         } else if (!isMoving && !gameState.isJumping && 
                    (typeof playerAnimations['run'] === 'object' && playerAnimations['run'].action && 
                     currentAnimation === playerAnimations['run'].action)) {
             // 待機アニメーションに切り替え
-            console.log("待機アニメーションに切り替え");
+            // console.log("待機アニメーションに切り替え");
             
             // 走りアニメーションを停止
             if (currentAnimation && typeof currentAnimation.stop === 'function') {
@@ -1495,17 +1554,49 @@ function animate() {
         
         // 炎エフェクトの数をデバッグ表示（100フレームに1回）
         if (frameCount % 100 === 0) {
-            console.log(`ドラゴンの炎エフェクト数: ${gameState.dragonFlameEffects.length}`);
+            // console.log(`ドラゴンの炎エフェクト数: ${gameState.dragonFlameEffects.length}`);
             
             // 炎エフェクトが存在する場合、最初のエフェクトの情報を表示
             if (gameState.dragonFlameEffects.length > 0) {
                 const flame = gameState.dragonFlameEffects[0];
-                console.log(`炎エフェクト情報: 寿命=${flame.currentLife}/${flame.lifetime}, パーティクル数=${flame.geometry.attributes.position.array.length / 3}`);
+                // console.log(`炎エフェクト情報: 寿命=${flame.currentLife}/${flame.lifetime}, パーティクル数=${flame.geometry.attributes.position.array.length / 3}`);
             }
         }
         
         // 衝突判定とダメージ処理
-        checkCollisions(gameState);
+        checkCollisions(gameState, isRollingAnimationPlaying);
+        
+        // 魔法陣での体力回復
+        const px = gameState.playerPosition.x;
+        const pz = gameState.playerPosition.z;
+        
+        // デバッグ：プレイヤー位置を表示（100フレームに1回）
+        if (frameCount % 100 === 0) {
+            // console.log(`プレイヤー位置: x=${px.toFixed(2)}, z=${pz.toFixed(2)}`);
+            // console.log(`現在体力: ${gameState.currentHealth}/${gameState.playerHealth}`);
+        }
+        
+        // 4つの魔法陣エリアにいるかチェック
+        const area1 = Math.abs(px - 10) < 3 && Math.abs(pz) < 3;
+        const area2 = Math.abs(px + 10) < 3 && Math.abs(pz) < 3;
+        const area3 = Math.abs(px) < 3 && Math.abs(pz - 10) < 3;
+        const area4 = Math.abs(px) < 3 && Math.abs(pz + 10) < 3;
+        const isInHealingArea = area1 || area2 || area3 || area4;
+        
+        // デバッグ：エリア判定を表示
+        if (isInHealingArea && frameCount % 10 === 0) {
+            // console.log(`魔法陣エリア内: area1=${area1}, area2=${area2}, area3=${area3}, area4=${area4}`);
+        }
+        
+        if (gameState.currentHealth < gameState.playerHealth && isInHealingArea) {
+            // 魔法陣エリア内では毎フレーム回復
+            const oldHealth = gameState.currentHealth;
+            gameState.currentHealth += 2;
+            if (gameState.currentHealth > gameState.playerHealth) {
+                gameState.currentHealth = gameState.playerHealth;
+            }
+            // console.log(`体力回復: ${oldHealth} → ${gameState.currentHealth}`);
+        }
         
         // 無敵時間の更新
         updateInvincibility(gameState);
@@ -1561,3 +1652,9 @@ animate();
 for (let i = 0; i < 5; i++) { // 初期状態で5本の柱を生成
     createParticleColumn(gameState, scene);
 }
+
+// 黄色いパーティクルエフェクト（魔法陣）を生成
+createYellowParticleEffect(gameState, scene);
+
+// リスタートボタンのセットアップ
+setupRestartButton(gameState, scene);

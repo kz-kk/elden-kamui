@@ -21,7 +21,7 @@ export function addGrass(scene, gameState) {
     ];
     
     // 草のテクスチャを読み込む（明示的にパスを指定）
-    console.log("草のテクスチャ読み込みを開始します...");
+    // console.log("草のテクスチャ読み込みを開始します...");
     const textureLoader = new THREE.TextureLoader();
     
     // 明示的に指定されたパス
@@ -48,7 +48,7 @@ export function addGrass(scene, gameState) {
         function(error) {
             console.error(`テクスチャ読み込み失敗: ${grassTexturePath}`, error);
             // 読み込み失敗時はフォールバックテクスチャを生成
-            console.log("フォールバックテクスチャを使用します");
+            // console.log("フォールバックテクスチャを使用します");
             const canvas = document.createElement('canvas');
             canvas.width = 64;
             canvas.height = 64;
@@ -62,7 +62,7 @@ export function addGrass(scene, gameState) {
     
     // テクスチャが読み込まれた後に草を生成する関数
     function createGrassWithTexture() {
-        console.log("草の生成を開始します。テクスチャ状態:", grassTexture ? "読み込み成功" : "読み込み失敗");
+        // console.log("草の生成を開始します。テクスチャ状態:", grassTexture ? "読み込み成功" : "読み込み失敗");
         
         // シェーダーベースの草を使用する場合
         if (gameState.useShaderGrass) {
@@ -379,7 +379,7 @@ export function addRocks(scene, gameState) {
     const rockCount = 100; // 岩の数を50個から100個に増加
     const areaSize = 45; // 配置範囲を広げる
     
-    console.log("岩のモデル読み込みを開始します...");
+    // console.log("岩のモデル読み込みを開始します...");
     
     // GLTFローダーを準備
     const loader = new GLTFLoader();
@@ -388,7 +388,7 @@ export function addRocks(scene, gameState) {
     loader.load(
         'assets/area/weathered_rock.glb', // 岩のモデルパス
         function(gltf) {
-            console.log("岩のモデル読み込み成功");
+            // console.log("岩のモデル読み込み成功");
             
             // 読み込んだモデルをテンプレートとして使用
             const rockTemplate = gltf.scene;
@@ -545,11 +545,11 @@ export function addRocks(scene, gameState) {
         function(error) {
             console.error("岩のモデル読み込み失敗:", error);
             // モデルのパスが間違っている可能性があるため別のパスも試す
-            console.log("別のパスで岩のモデルの読み込みを試みます...");
+            // console.log("別のパスで岩のモデルの読み込みを試みます...");
             loader.load(
                 'assets/rocks/weathered_rock.glb', // 代替パス
                 function(gltf) {
-                    console.log("代替パスから岩のモデル読み込み成功");
+                    // console.log("代替パスから岩のモデル読み込み成功");
                     // 読み込んだモデルをテンプレートとして使用
                     const rockTemplate = gltf.scene;
                     
@@ -758,7 +758,7 @@ export function updateGrassWind(gameState) {
  * @param {THREE.WebGLRenderer} renderer - Three.jsのレンダラーオブジェクト
  */
 export function createDefaultEnvMap(scene, renderer) {
-    console.log("代替の環境マップを生成します");
+    // console.log("代替の環境マップを生成します");
     
     // PMREMGeneratorを使用して環境マップを生成
     const pmremGenerator = new PMREMGenerator(renderer);
@@ -812,5 +812,5 @@ export function createDefaultEnvMap(scene, renderer) {
     envGeometry.dispose();
     envMaterial.dispose();
     
-    console.log("代替の環境マップを生成しました");
+    // console.log("代替の環境マップを生成しました");
 }
