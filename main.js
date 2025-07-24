@@ -1726,6 +1726,9 @@ function showGameScreen() {
     gameState.videoPlaying = false;
     gameState.gameStartTime = Date.now(); // ゲーム開始時刻を記録
     
+    // プレイヤーの体力を満タンにリセット
+    gameState.currentHealth = gameState.playerHealth;
+    
     // 音声を初期化（初回のみ）
     initializeAudio();
     

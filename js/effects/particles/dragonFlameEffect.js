@@ -182,6 +182,14 @@ export function createDragonFlameEffect(gameState, scene) {
             
             // 重力の影響を考慮した放物線の初期速度調整
             velocities[i3 + 1] += 0.1; // 上向きの初速を少し加える
+            
+            // 遠距離攻撃の場合、一部のパーティクルを直接地面近くに生成
+            if (distanceToTarget > 20 && Math.random() < 0.3) {
+                positions[i3] = targetPos.x + (Math.random() - 0.5) * 10;
+                positions[i3 + 1] = gameState.groundLevel + 1 + Math.random() * 3;
+                positions[i3 + 2] = targetPos.z + (Math.random() - 0.5) * 10;
+                velocities[i3 + 1] = -0.05; // 下向きの速度
+            }
         } else {
             // 通常の速度設定
             const speed = 0.2 + Math.random() * 0.3;
@@ -195,8 +203,10 @@ export function createDragonFlameEffect(gameState, scene) {
         accelerations[i3 + 1] = -0.015; // 重力をより強く
         accelerations[i3 + 2] = 0;
         
-        // 寿命設定
-        const baseDuration = 60 + Math.random() * 30;
+        // 寿命設定（距離に応じて延長）
+        const distanceToGround = Math.max(0, flameOrigin.y - gameState.groundLevel);
+        const distanceToPlayer = flameOrigin.distanceTo(gameState.playerPosition);
+        const baseDuration = Math.max(120, 60 + distanceToGround * 10 + distanceToPlayer * 2);
         maxLifetimes[i] = baseDuration;
         lifetimes[i] = baseDuration;
         
@@ -288,6 +298,14 @@ export function createDragonFlameEffect(gameState, scene) {
             // 寿命を延長（地面の炎をより長く持続）
             lifetimes[i] *= 3.0;
             
+            // 地面の炎のサイズを大きくする
+            scales[i] = Math.max(scales[i] * 3.0, 8.0);
+            
+            // 地面の炎の色を強化（より明るく、見やすく）
+            colors[i3] = 1.0;     // 赤を最大に
+            colors[i3 + 1] = 0.8; // 緑を強化（オレンジ色）
+            colors[i3 + 2] = 0.1; // 青を少し
+            
             // 加速度を調整（地面に沿った動きに）
             accelerations[i3] = 0;
             accelerations[i3 + 1] = 0;
@@ -329,6 +347,10 @@ export function createDragonFlameEffect(gameState, scene) {
     
     // パーティクルシステムを作成
     const flameParticles = new THREE.Points(particleGeometry, flameMaterial);
+    
+    // フラスタムカリングを無効化して画面外からの炎も描画
+    flameParticles.frustumCulled = false;
+    
     scene.add(flameParticles);
     
     // エフェクトオブジェクト
