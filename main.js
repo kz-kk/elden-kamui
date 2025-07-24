@@ -605,7 +605,7 @@ if (loader) {
                                 scene: runGltf.scene
                             };
                             
-                            // console.log("走るアニメーションの詳細:", {
+                            console.log("走るアニメーションの詳細:", {
                                 type: typeof runAction,
                                 hasStop: typeof runAction.stop === 'function', 
                                 hasReset: typeof runAction.reset === 'function',
@@ -1457,8 +1457,9 @@ function movePlayer() {
                     currentAnimation.play();
                 }
                 
-                // console.log("走りモデルの位置:", 
-                    playerAnimations['run'].scene ? playerAnimations['run'].scene.position.toArray() : "シーンなし");
+                console.log("走りモデルの位置:", 
+                    playerAnimations['run'].scene ? playerAnimations['run'].scene.position.toArray() : "シーンなし"
+                );
                 // console.log("プレイヤーの位置:", gameState.playerPosition.toArray());
             }
             
