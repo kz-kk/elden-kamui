@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 
 /**
- * カメラモードを切り替える関数
+ * カメラモードを切り替える関数（シンプル化：2つの視点のみ）
  * @param {Object} gameState - ゲームの状態オブジェクト
  * @param {THREE.OrbitControls} controls - OrbitControlsオブジェクト
  * @param {THREE.Camera} camera - カメラオブジェクト
@@ -13,46 +13,47 @@ import * as THREE from 'three';
 export function toggleCameraMode(gameState, controls, camera, cameraInfo) {
     // シネマティックモード中はCキーでの切り替えを無効化
     if (gameState.cinematicCamera) {
-        // console.log("シネマティックモード中はCキーでの切り替えはできません");
         return;
     }
     
-    // カメラモードを循環させる: プレイヤー軌道 -> プレイヤー追随（ドラッグ可能） -> 自由カメラ -> プレイヤー軌道...
-    if (gameState.orbitPlayerCamera) {
-        // プレイヤー軌道カメラからプレイヤー追随カメラ（ドラッグ可能）へ
-        gameState.orbitPlayerCamera = false;
-        gameState.followPlayerCamera = true;
-        gameState.freeCamera = false;
-        controls.enabled = true; // OrbitControlsを有効化（ドラッグ操作用）
-        cameraInfo.innerHTML = 'カメラモード: プレイヤー追随（ドラッグ可能）(Cキーで切替)';
-        // ターゲットをプレイヤーに設定
-        controls.target.copy(gameState.playerPosition);
-        // カメラ位置を追随位置に初期化
-        updateFollowCameraPosition(gameState, camera);
-        // 即座にカメラを正しい位置に配置するため、lerp効果をスキップ
-        const targetPosition = new THREE.Vector3(
-            gameState.playerPosition.x - Math.sin(gameState.playerRotation) * gameState.cameraOffset.z,
-            gameState.playerPosition.y + gameState.cameraOffset.y,
-            gameState.playerPosition.z - Math.cos(gameState.playerRotation) * gameState.cameraOffset.z
-        );
-        camera.position.copy(targetPosition);
-    } else if (gameState.followPlayerCamera) {
-        // プレイヤー追随カメラから自由カメラへ
+    // 2つのモードを切り替え: キャラクター追随 ⇔ 自由視点（遠景）
+    if (gameState.followPlayerCamera) {
+        // キャラクター追随から自由視点（遠景）へ
         gameState.followPlayerCamera = false;
         gameState.freeCamera = true;
-        gameState.orbitPlayerCamera = false;
         controls.enabled = true;
-        cameraInfo.innerHTML = 'カメラモード: 自由カメラ (Cキーで切替)';
-        // 現在のカメラ位置を維持
+        
+        // 遠景用の位置に移動（さらに距離を短縮）
+        camera.position.set(
+            gameState.playerPosition.x + 5,
+            gameState.playerPosition.y + 4,
+            gameState.playerPosition.z + 5
+        );
         controls.target.copy(gameState.playerPosition);
+        
+        if (cameraInfo) {
+            cameraInfo.innerHTML = 'カメラモード: 自由視点（遠景） (Cキーで切替)';
+        }
+        console.log('カメラモード: 自由視点（遠景）');
     } else {
-        // 自由カメラからプレイヤー軌道カメラへ
+        // 自由視点からキャラクター追随へ
         gameState.freeCamera = false;
-        gameState.followPlayerCamera = false;
-        gameState.orbitPlayerCamera = true;
+        gameState.followPlayerCamera = true;
         controls.enabled = true;
-        cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切替)';
+        
+        // キャラクター追随位置に移動（より近い距離）
+        const targetPosition = new THREE.Vector3(
+            gameState.playerPosition.x - Math.sin(gameState.playerRotation) * 4,
+            gameState.playerPosition.y + 2.5,  // 少し低く
+            gameState.playerPosition.z - Math.cos(gameState.playerRotation) * 4
+        );
+        camera.position.copy(targetPosition);
         controls.target.copy(gameState.playerPosition);
+        
+        if (cameraInfo) {
+            cameraInfo.innerHTML = 'カメラモード: キャラクター追随 (Cキーで切替)';
+        }
+        console.log('カメラモード: キャラクター追随');
     }
 }
 
@@ -112,7 +113,7 @@ export function updateFollowCamera(gameState, camera) {
 }
 
 /**
- * カメラの更新を共通化する関数
+ * カメラの更新を共通化する関数（シンプル化）
  * @param {Object} gameState - ゲームの状態オブジェクト
  * @param {THREE.OrbitControls} controls - OrbitControlsオブジェクト
  * @param {THREE.Camera} camera - カメラオブジェクト
@@ -121,35 +122,41 @@ export function updateCamera(gameState, controls, camera) {
     // カメラモードに応じた更新
     if (gameState.cinematicCamera) {
         // シネマティックカメラモード
-        // 回転角度を更新
         gameState.cinematicRotation += gameState.cinematicSpeed;
         
-        // カメラ位置を計算（プレイヤーを中心に円周上を移動）
         const x = gameState.playerPosition.x + Math.cos(gameState.cinematicRotation) * gameState.cinematicDistance;
         const y = gameState.playerPosition.y + gameState.cinematicHeight;
         const z = gameState.playerPosition.z + Math.sin(gameState.cinematicRotation) * gameState.cinematicDistance;
         
-        // カメラ位置を設定
         camera.position.set(x, y, z);
-        
-        // カメラはプレイヤーを注視
         camera.lookAt(gameState.playerPosition.x, gameState.playerPosition.y + 1, gameState.playerPosition.z);
         
-        // OrbitControlsのターゲットも更新（念のため）
         controls.target.copy(gameState.playerPosition);
-        controls.enabled = false; // マウス操作を無効化
+        controls.enabled = false;
     } else if (gameState.followPlayerCamera) {
-        // プレイヤー追随カメラモード（ドラッグ可能）
+        // キャラクター追随モード
         controls.enabled = true;
-        // ターゲットはプレイヤーに滑らかに追従
         controls.target.lerp(gameState.playerPosition, 0.1);
         
-        // カメラ位置を更新
-        updateFollowCameraPosition(gameState, camera);
-    } else if (gameState.freeCamera || gameState.orbitPlayerCamera) {
-        // 自由カメラモードとプレイヤー軌道カメラモードでは、
+        // キャラクターの後ろに追随（より近い距離）
+        const targetPosition = new THREE.Vector3(
+            gameState.playerPosition.x - Math.sin(gameState.playerRotation) * 4,
+            gameState.playerPosition.y + 2.5,  // 少し低く
+            gameState.playerPosition.z - Math.cos(gameState.playerRotation) * 4
+        );
+        camera.position.lerp(targetPosition, 0.1);
+        
+        // カメラの注視点をキャラクターの少し上に設定（自然な視線）
+        const lookAtTarget = new THREE.Vector3(
+            gameState.playerPosition.x,
+            gameState.playerPosition.y + 1.5,  // キャラクターの頭部あたりを注視
+            gameState.playerPosition.z
+        );
+        camera.lookAt(lookAtTarget);
+    } else if (gameState.freeCamera) {
+        // 自由視点（遠景）モード
         controls.enabled = true;
-        // プレイヤーが移動したらOrbitControlsのターゲットを滑らかに更新
-        controls.target.lerp(gameState.playerPosition, 0.05); // より遅い追従
+        // プレイヤーを注視点として緩やかに追従
+        controls.target.lerp(gameState.playerPosition, 0.02);
     }
 } 

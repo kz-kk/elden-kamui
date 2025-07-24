@@ -46,6 +46,11 @@ const gameState = {
     playerModel: null,
     dragonModel: null,
     isLoading: true,
+    gameStarted: false,
+    videoPlaying: false,
+    loadingProgress: 0,
+    totalAssets: 0,
+    loadedAssets: 0,
     keysPressed: {},
     playerPosition: new THREE.Vector3(0, -5.0, 0), // プレイヤーの位置を地面に合わせて調整（地面は-5.0）
     playerRotation: 0,
@@ -53,10 +58,9 @@ const gameState = {
     cameraOffset: new THREE.Vector3(0, 2, 5), // カメラの相対位置
     // モデルの向き調整用オフセット（GLTFモデルの初期向きによる）
     playerModelRotationOffset: -Math.PI / 2, // 90度（左向きから前向きに調整）
-    // カメラモード
-    freeCamera: false, // 自由カメラモード
-    orbitPlayerCamera: true, // プレイヤー軌道カメラモード
-    followPlayerCamera: false, // プレイヤー追随カメラモード（ドラッグ可能）
+    // カメラモード（シンプル化：2つのモードのみ）
+    freeCamera: false, // 自由視点（遠景）モード
+    followPlayerCamera: true, // キャラクター追随モード
     cinematicCamera: false, // シネマティックカメラモード
     cinematicRotation: 0, // シネマティックカメラの回転角度
     cinematicDistance: 10, // シネマティックカメラの距離（近づけた）
@@ -206,11 +210,14 @@ const gameState = {
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x4a4a4a); // 背景色をさらに明るく
-const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウマップを使用
+
+// 最初はcanvasを非表示にする
+renderer.domElement.style.display = 'none';
 document.body.appendChild(renderer.domElement);
 
 // OrbitControlsの設定（マウスドラッグでカメラ操作用）
@@ -219,15 +226,12 @@ controls.enableDamping = true; // 滑らかなカメラ移動
 controls.dampingFactor = 0.05;
 controls.screenSpacePanning = false;
 controls.minDistance = 1;
-controls.maxDistance = 50;
+controls.maxDistance = 15;
 controls.maxPolarAngle = Math.PI / 2; // 地面より下にカメラが行かないように制限
 // 常にコントロールを有効にし、プレイヤー中心の軌道カメラモードを初期設定にする
 controls.enabled = true;
 gameState.freeCamera = false;
-gameState.orbitPlayerCamera = true; // プレイヤー中心の軌道カメラモード
-
-// UI情報の表示の更新
-document.getElementById('info').innerHTML = '矢印キー: 移動 | 左右: 回転 | 上下: 前後移動 | スペース: ジャンプ | C: カメラモード切替 | マウスドラッグ: カメラ回転 | ホイール: ズーム';
+gameState.followPlayerCamera = true; // 初期はキャラクター追随モード
 
 // カメラボタンのイベントリスナー
 const cameraButton = document.getElementById('cameraButton');
@@ -428,6 +432,7 @@ let isRollingAnimationPlaying = false; // ローリングアニメーション�
 // プレイヤーモデルの読み込み試行
 if (loader) {
     try {
+        updateLoadingProgress('Loading player model...');
         loader.load('assets/knight/wait.glb', (gltf) => {
             // console.log("プレイヤー待機モデル読み込み成功:", gltf);
             
@@ -543,6 +548,7 @@ if (loader) {
                 currentAnimation.play();
                 
                 // 走るアニメーションを読み込む
+                updateLoadingProgress('Loading run animation...');
                 loader.load('assets/knight/run.glb', (runGltf) => {
                     // console.log("プレイヤー走りモデル読み込み成功:", runGltf);
                     // console.log("走りモデルのアニメーション数:", runGltf.animations ? runGltf.animations.length : 0);
@@ -631,6 +637,7 @@ if (loader) {
                 });
                 
                 // 攻撃アニメーションを読み込む
+                updateLoadingProgress('Loading attack animation...');
                 loader.load('assets/knight/attach.glb', (attachGltf) => {
                     // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
                     if (attachGltf.animations && attachGltf.animations.length > 0) {
@@ -824,6 +831,7 @@ if (loader) {
 
             // ドラゴンモデルの読み込み試行
             try {
+                updateLoadingProgress('Loading dragon model...');
                 loader.load('assets/dragon/fly.glb', (gltf) => {
                     // console.log("ドラゴンモデル読み込み成功:", gltf);
                     
@@ -912,9 +920,13 @@ if (loader) {
                 console.error("ドラゴンモデル読み込み例外:", e);
             }
             
-            // ロード完了
+            // ロード完了時の処理
+            updateLoadingProgress('Finalizing...');
             gameState.isLoading = false;
             document.getElementById('loading').style.display = 'none';
+            
+            // ローディング完了処理
+            onLoadingComplete();
         }, 
         (xhr) => {
             // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーモデル読み込み中...');
@@ -924,27 +936,45 @@ if (loader) {
             // エラー時にも仮表示で続行
             gameState.isLoading = false;
             document.getElementById('loading').style.display = 'none';
+            
+            // ローディング完了処理
+            onLoadingComplete();
         });
     } catch (e) {
         console.error("プレイヤーモデル読み込み例外:", e);
         // 例外時にも仮表示で続行
         gameState.isLoading = false;
         document.getElementById('loading').style.display = 'none';
+        
+        // ローディング完了処理
+        onLoadingComplete();
     }
 } else {
     console.warn("GLTFLoaderが利用できません。仮表示のみで続行します。");
     gameState.isLoading = false;
     document.getElementById('loading').style.display = 'none';
+    
+    // ローディング完了処理
+    onLoadingComplete();
 }
 
 // 音声の設定
-try {
-    const audioListener = new AudioListener();
+let bgmSound = null;  // BGMを外部スコープで定義
+let windSound = null;  // 環境音も外部スコープで定義
+let audioInitialized = false;  // 音声が初期化されたかのフラグ
+
+// 音声を初期化する関数
+function initializeAudio() {
+    if (audioInitialized) return;  // すでに初期化済みの場合はスキップ
+    audioInitialized = true;
+    
+    try {
+        const audioListener = new AudioListener();
     if (audioListener) {
         camera.add(audioListener);
 
         // BGM
-        const bgmSound = new Audio(audioListener);
+        bgmSound = new Audio(audioListener);
         const audioLoader = new AudioLoader();
         
         if (audioLoader) {
@@ -957,7 +987,7 @@ try {
             });
 
             // 環境音
-            const windSound = new Audio(audioListener);
+            windSound = new Audio(audioListener);
             audioLoader.load('assets/sound/wind.mp3', (buffer) => {
                 windSound.setBuffer(buffer);
                 windSound.setLoop(true);
@@ -1206,18 +1236,13 @@ try {
                     // console.log("ローリングアニメーション開始 - 向いている方向に移動");
                 }
                 
-                // 音楽再生（ユーザーインタラクション後に再生開始）
-                if (bgmSound.buffer && !bgmSound.isPlaying) {
-                    bgmSound.play();
-                }
-                if (windSound.buffer && !windSound.isPlaying) {
-                    windSound.play();
-                }
+                // 音楽再生は動画完了後に行うため、ここでは再生しない
             });
         }
     }
-} catch (e) {
-    console.error("音声初期化エラー:", e);
+    } catch (e) {
+        console.error("音声初期化エラー:", e);
+    }
 }
 
 
@@ -1642,9 +1667,9 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// 初期カメラ位置の設定
-camera.position.set(0, 10, 20); // 高さをさらに上げて俯瞰視点に
-camera.lookAt(new THREE.Vector3(0, -5.0, 0)); // 地面の位置を注視
+// 初期カメラ位置の設定（追随モードに合わせて調整）
+camera.position.set(0, 2.5, 4); // より近くに配置
+camera.lookAt(new THREE.Vector3(0, -3.5, 0)); // キャラクターの頭部あたりを注視
 
 // アニメーション開始
 animate();
@@ -1659,3 +1684,159 @@ createYellowParticleEffect(gameState, scene);
 
 // リスタートボタンのセットアップ
 setupRestartButton(gameState, scene);
+
+// スタートボタンとビデオ制御の機能
+function showGameScreen() {
+    // ローディングが完了していない場合は待機
+    if (gameState.isLoading) {
+        console.log('ローディング中のため、ゲーム画面表示を待機中...');
+        return;
+    }
+    
+    // すでにゲームが開始されている場合は何もしない
+    if (gameState.gameStarted) {
+        console.log('ゲームはすでに開始されています');
+        return;
+    }
+    
+    // スタート画面を完全に非表示
+    const startScreen = document.getElementById('startScreen');
+    if (startScreen) {
+        startScreen.style.display = 'none';
+    }
+    
+    // ビデオを非表示・停止
+    const introVideo = document.getElementById('introVideo');
+    if (introVideo) {
+        introVideo.style.display = 'none';
+        introVideo.pause();
+        introVideo.currentTime = 0; // ビデオを最初に巻き戻し
+    }
+    
+    // 3Dキャンバスを表示
+    renderer.domElement.style.display = 'block';
+    
+    // UIを表示
+    document.getElementById('info').style.opacity = '1';
+    
+    gameState.gameStarted = true;
+    gameState.videoPlaying = false;
+    
+    // 音声を初期化（初回のみ）
+    initializeAudio();
+    
+    // BGMと環境音の再生開始
+    setTimeout(() => {
+        if (bgmSound && bgmSound.buffer && !bgmSound.isPlaying) {
+            bgmSound.play();
+            console.log('BGM再生開始');
+        }
+        if (windSound && windSound.buffer && !windSound.isPlaying) {
+            windSound.play();
+            console.log('環境音再生開始');
+        }
+    }, 500); // 少し遅延させて確実に初期化後に再生
+    
+    console.log('ゲーム画面を表示しました');
+}
+
+// ローディング進行状況を更新する関数
+function updateLoadingProgress(message) {
+    const loadingText = document.getElementById('loadingText');
+    if (loadingText) {
+        loadingText.textContent = message;
+    }
+}
+
+// ローディング完了時にスタートボタンを表示する関数
+function onLoadingComplete() {
+    console.log('ローディング完了');
+    
+    // STARTボタンを表示・有効化
+    const startButton = document.getElementById('startButton');
+    const loadingText = document.getElementById('loadingText');
+    
+    if (startButton) {
+        startButton.style.display = 'block';
+        startButton.disabled = false;
+        startButton.textContent = 'START';
+    }
+    
+    if (loadingText) {
+        loadingText.textContent = 'Ready to Start!';
+    }
+    
+    // ここでは自動でゲーム画面を表示しない
+    // ユーザーがSTARTボタンを押すまで待機
+    console.log('STARTボタンが有効になりました。ユーザーの操作を待機中...');
+}
+
+// ページ読み込み完了時の初期化
+document.addEventListener('DOMContentLoaded', function() {
+    const startButton = document.getElementById('startButton');
+    const startScreen = document.getElementById('startScreen');
+    const introVideo = document.getElementById('introVideo');
+    const loadingText = document.getElementById('loadingText');
+    
+    // 初期状態でローディング中を表示
+    if (loadingText) {
+        loadingText.textContent = 'Loading assets...';
+    }
+    
+    if (startButton && startScreen && introVideo) {
+        // ビデオのイベントリスナーを先に設定（重複防止）
+        let videoEventsSet = false;
+        
+        function setupVideoEvents() {
+            if (videoEventsSet) return;
+            videoEventsSet = true;
+            
+            // ビデオ終了時の処理
+            introVideo.addEventListener('ended', function() {
+                console.log('ビデオ再生完了');
+                gameState.videoPlaying = false;
+                if (!gameState.gameStarted) {
+                    showGameScreen();
+                }
+            });
+            
+            // ビデオをクリックしてスキップ可能
+            introVideo.addEventListener('click', function() {
+                console.log('ビデオスキップ');
+                introVideo.pause();
+                gameState.videoPlaying = false;
+                if (!gameState.gameStarted) {
+                    showGameScreen();
+                }
+            });
+        }
+        
+        startButton.addEventListener('click', function() {
+            // ボタンが無効の場合は何もしない
+            if (startButton.disabled) {
+                return;
+            }
+            
+            // スタート画面を非表示
+            startScreen.style.display = 'none';
+            
+            // ビデオを表示して再生開始
+            introVideo.style.display = 'block';
+            gameState.videoPlaying = true;
+            
+            // ビデオイベントを設定
+            setupVideoEvents();
+            
+            introVideo.play().then(() => {
+                console.log('ビデオ再生開始');
+            }).catch((error) => {
+                console.error('ビデオ再生エラー:', error);
+                // ビデオ再生に失敗した場合は直接ゲーム開始
+                gameState.videoPlaying = false;
+                if (!gameState.gameStarted) {
+                    showGameScreen();
+                }
+            });
+        });
+    }
+});
