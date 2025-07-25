@@ -21,7 +21,7 @@ export function updateDragon(gameState) {
             waitCount: 0,          // 待機回数カウンター
             actionTimer: 0,        // アクション時間カウンター
             flyDuration: 300,      // 1回の飛行持続時間（フレーム）
-            waitDuration: 180      // 1回の待機持続時間（フレーム）
+            waitDuration: 120      // 1回の待機持続時間を2秒に短縮（フレーム）
         };
     }
 

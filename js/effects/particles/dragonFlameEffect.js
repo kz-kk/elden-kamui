@@ -251,8 +251,8 @@ export function createDragonFlameEffect(gameState, scene) {
                     gameState.playerPosition.z - positions[i3 + 2]
                 ).normalize();
                 
-                // プレイヤー方向への速度を強める
-                const spreadSpeed = 0.2 + Math.random() * 0.1; // 速度を上げる
+                // プレイヤー方向への速度を大幅に上げる（ローリング回避可能にするため）
+                const spreadSpeed = 0.5 + Math.random() * 0.3; // 速度を大幅に上げる
                 velocities[i3] = toPlayer.x * spreadSpeed;
                 velocities[i3 + 1] = 0.01; // わずかな上向きの速度
                 velocities[i3 + 2] = toPlayer.z * spreadSpeed;
@@ -263,15 +263,15 @@ export function createDragonFlameEffect(gameState, scene) {
                     Math.pow(positions[i3 + 2] - gameState.playerPosition.z, 2)
                 );
                 
-                if (distToPlayer < 6.0) { // 検知距離を縮小
-                    const speedMultiplier = 1.0 + (6.0 - distToPlayer) / 8.0; // 速度増加を抑制
+                if (distToPlayer < 8.0) { // 検知距離を元に戻す
+                    const speedMultiplier = 1.0 + (8.0 - distToPlayer) / 4.0; // 速度増加を元に戻す
                     velocities[i3] *= speedMultiplier;
                     velocities[i3 + 2] *= speedMultiplier;
                     
-                    // プレイヤーが近い場合の速度も制限
+                    // プレイヤーが近い場合、より積極的に追尾
                     if (distToPlayer < 3.0) {
-                        velocities[i3] = toPlayer.x * (0.15 + Math.random() * 0.1); // 速度を大幅に抑制
-                        velocities[i3 + 2] = toPlayer.z * (0.15 + Math.random() * 0.1);
+                        velocities[i3] = toPlayer.x * (0.6 + Math.random() * 0.4); // 速度を大幅に上げる
+                        velocities[i3 + 2] = toPlayer.z * (0.6 + Math.random() * 0.4);
                     }
                 }
                 
@@ -286,11 +286,11 @@ export function createDragonFlameEffect(gameState, scene) {
                 }
             }
             
-            // 寿命を延長（地面の炎をより長く持続）
-            lifetimes[i] *= 3.0;
+            // 寿命を短く設定（地面の炎を早めに消す）
+            lifetimes[i] *= 10;
             
             // 地面の炎のサイズを大きくする
-            scales[i] = Math.max(scales[i] * 3.0, 8.0);
+            scales[i] = Math.max(scales[i] * 1.0, 5.0);
             
             // 地面の炎の色を強化（より明るく、見やすく）
             colors[i3] = 1.0;     // 赤を最大に

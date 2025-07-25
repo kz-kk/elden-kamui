@@ -28,8 +28,8 @@ export function updateAllEffects(gameState, scene) {
         gameState.dustSpawnTimer--;
     }
     
-    // 草の揺れを更新
-    updateGrassWind(gameState);
+    // 草の揺れを更新（一旦コメントアウト）
+    // updateGrassWind(gameState);
     
     // 各炎エフェクトを更新
     for (let i = gameState.flameEffects.length - 1; i >= 0; i--) {
@@ -139,7 +139,7 @@ export function updateAllEffects(gameState, scene) {
  * @param {THREE.Scene} scene - Three.jsのシーンオブジェクト
  */
 function performSceneCleanup(gameState, scene) {
-    console.log('シーンクリーンアップを実行中...');
+    // console.log('シーンクリーンアップを実行中...');
     
     // 非表示またはnullのオブジェクトを削除
     const objectsToRemove = [];
@@ -168,5 +168,5 @@ function performSceneCleanup(gameState, scene) {
         window.gc();
     }
     
-    console.log(`クリーンアップ完了: ${objectsToRemove.length}個のオブジェクトを削除`);
+    // console.log(`クリーンアップ完了: ${objectsToRemove.length}個のオブジェクトを削除`);
 } 

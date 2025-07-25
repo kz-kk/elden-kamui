@@ -292,7 +292,7 @@ export function checkCollisions(gameState, isRollingAnimationPlaying) {
                     // console.log(`空中の炎との衝突を検出！距離: ${distance.toFixed(2)}`);
                     
                     // ダメージを与える
-                    applyDamage(gameState, 15, gameOver); // 空中の炎は少し強いダメージ
+                    applyDamage(gameState, 35, gameOver); // 空中の炎のダメージを更に大幅に増加
                     return; // 一度ダメージを受けたら処理を終了
                 }
             }

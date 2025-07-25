@@ -160,7 +160,7 @@ export function checkYellowParticleHealing(gameState) {
         const distance = Math.sqrt(dx * dx + dz * dz);
         
         if (distance <= range && gameState.currentHealth < gameState.playerHealth) {
-            gameState.currentHealth += 1.5; // 適度な回復量
+            gameState.currentHealth += 3.0; // 回復量を増加
             if (gameState.currentHealth > gameState.playerHealth) {
                 gameState.currentHealth = gameState.playerHealth;
             }

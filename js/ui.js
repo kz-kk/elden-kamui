@@ -10,7 +10,12 @@ export function updateHealthBar(gameState) {
     
     if (healthBar) {
         healthBar.style.width = `${healthPercent}%`;
-        healthBar.style.backgroundColor = '#9b000f';
+        // 回復中は深い緑色、通常時は赤色
+        if (gameState.isHealing) {
+            healthBar.style.backgroundColor = '#006400'; // 深い緑色
+        } else {
+            healthBar.style.backgroundColor = '#9b000f'; // 赤色
+        }
     }
     
     // ダメージを受けた時の点滅効果

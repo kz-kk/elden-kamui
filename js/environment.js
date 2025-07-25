@@ -7,8 +7,8 @@ import { PMREMGenerator } from 'three';
 
 // 草を生やす関数
 export function addGrass(scene, gameState) {
-    // 草の数と配置範囲
-    const grassCount = 5000; // 草の数を増加
+    // 草の数と配置範囲（軽量化のため大幅に削減）
+    const grassCount = 1000; // 草の数を5000から1000に削減
     const areaSize = 30;
     
     // 草の色のバリエーション（画像に色を乗算）
@@ -376,7 +376,7 @@ export function addGrass(scene, gameState) {
 // 岩を配置する関数
 export function addRocks(scene, gameState) {
     // 岩の数と配置範囲
-    const rockCount = 100; // 岩の数を50個から100個に増加
+    const rockCount = 70; // 岩の数を適度に減らす
     const areaSize = 45; // 配置範囲を広げる
     
     // console.log("岩のモデル読み込みを開始します...");
@@ -707,6 +707,11 @@ export function addRocks(scene, gameState) {
 
 // 草の揺れを更新する関数
 export function updateGrassWind(gameState) {
+    // パフォーマンス向上のため、5フレームに1回だけ更新
+    if (!gameState.grassUpdateCounter) gameState.grassUpdateCounter = 0;
+    gameState.grassUpdateCounter++;
+    if (gameState.grassUpdateCounter % 5 !== 0) return;
+    
     // 現在の時間を取得（風のアニメーションに使用）
     const time = performance.now() * 0.001;
     

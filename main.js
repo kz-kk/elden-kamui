@@ -63,9 +63,9 @@ const gameState = {
     followPlayerCamera: true, // キャラクター追随モード
     cinematicCamera: false, // シネマティックカメラモード
     cinematicRotation: 0, // シネマティックカメラの回転角度
-    cinematicDistance: 10, // シネマティックカメラの距離（近づけた）
-    cinematicHeight: 5, // シネマティックカメラの高さ（低くした）
-    cinematicSpeed: 0.002, // シネマティックカメラの回転速度（少し速く）
+    cinematicDistance: 15, // シネマティックカメラの距離（近づけた）
+    cinematicHeight: 2.5, // シネマティックカメラの高さをより低くして水平に
+    cinematicSpeed: 0.003, // シネマティックカメラの回転速度をさらに高速化
     gameStartTime: null, // ゲーム開始時刻を記録
     
     // アニメーション関連
@@ -195,7 +195,11 @@ const gameState = {
     
     // パフォーマンス管理
     sceneCleanupTimer: 0,
-    sceneCleanupInterval: 600, // 10秒間隔でシーンクリーンアップ
+    sceneCleanupInterval: 300, // 5秒間隔でシーンクリーンアップ
+    
+    // 回復エフェクト関連
+    isHealing: false, // 回復中フラグ
+    healingParticles: null, // 回復パーティクルエフェクト
     
     // 岩の衝突判定関連
     rocks: [], // 岩のオブジェクトを保存する配列
@@ -208,14 +212,14 @@ const gameState = {
     groundFireParticleCount: 120, // 地面の炎の粒子の数
     groundFireSpreadRadius: 1.5, // 地面の炎の広がり半径
     groundFireHeight: 3.2, // 地面の炎の高さ
-    groundFireDamage: 5, // 地面の炎のダメージ量
+    groundFireDamage: 20, // 地面の炎のダメージ量を大幅に増加
     shouldCreateDragonFlame: false, // ドラゴンの炎エフェクト生成フラグ
     isOnRock: false, // 岩の上にいるかどうか
     
     // 体力回復関連のパラメータ
     healingTimer: 30, // 体力回復のタイマー（初期値を間隔と同じに設定）
     healingInterval: 30, // 体力回復の間隔（フレーム単位）
-    healingAmount: 1, // 1回の回復量
+    healingAmount: 3, // 1回の回復量を増加
 };
 
 // シーン、カメラ、レンダラーの設定
@@ -343,8 +347,8 @@ ground.position.y = -5.0; // 地面をさらに下げる
 ground.receiveShadow = true;
 scene.add(ground);
 
-// 草を生やす関数
-addGrass(scene, gameState);
+// 草を生やす関数（一旦コメントアウト）
+// addGrass(scene, gameState);
 
 // 岩を配置
 addRocks(scene, gameState);
@@ -1057,6 +1061,18 @@ function initializeAudio() {
                 console.error('パチパチ音読み込みエラー:', error);
             });
 
+            // 回復音
+            const healSound = new Audio(audioListener);
+            audioLoader.load('assets/sound/heal.mp3', (buffer) => {
+                healSound.setBuffer(buffer);
+                healSound.setLoop(false);
+                healSound.setVolume(1.0);
+                gameState.sounds.heal = healSound;
+                // console.log('回復音読み込み成功');
+            }, null, (error) => {
+                console.error('回復音読み込みエラー:', error);
+            });
+
             // キー入力の処理
             window.addEventListener('keydown', (e) => {
                 gameState.keysPressed[e.key] = true;
@@ -1088,6 +1104,18 @@ function initializeAudio() {
                 // 体力回復テスト用（Hキー）
                 if (e.key === 'h' || e.key === 'H') {
                     gameState.currentHealth = Math.max(1, gameState.currentHealth - 10);
+                }
+                
+                // foot.mp3再生（Rキー）
+                if (e.key === 'r' || e.key === 'R') {
+                    if (gameState.sounds.footstep && gameState.sounds.footstep.buffer) {
+                        if (gameState.sounds.footstep.isPlaying) {
+                            gameState.sounds.footstep.stop();
+                        }
+                        gameState.sounds.footstep.setVolume(1.0);
+                        gameState.sounds.footstep.play();
+                        console.log('foot.mp3再生');
+                    }
                 }
                 
                 // 体力回復テスト（Tキー）
@@ -1245,6 +1273,18 @@ function initializeAudio() {
                     isRollingAnimationPlaying = true;
                     gameState.isRolling = true;
                     gameState.rollingCooldown = 15; // クールダウン設定（短縮）
+                    
+                    // ローリング音を再生（foot.mp3）
+                    if (gameState.sounds.footstep && gameState.sounds.footstep.buffer) {
+                        // 現在再生中の場合は停止してから再生
+                        if (gameState.sounds.footstep.isPlaying) {
+                            gameState.sounds.footstep.stop();
+                        }
+                        // 少し音量を上げてローリング音として再生
+                        gameState.sounds.footstep.setVolume(0.8);
+                        gameState.sounds.footstep.play();
+                        console.log('ローリング音（foot.mp3）再生開始');
+                    }
                     
                     // console.log("ローリングアニメーション開始 - 向いている方向に移動");
                 }
@@ -1552,6 +1592,12 @@ function animate() {
         return;
     }
 
+    // ゲーム開始前は最小限の処理のみ実行
+    if (!gameState.gameStarted) {
+        renderer.render(scene, camera);
+        return;
+    }
+
     // アニメーションの更新
     if (mixer) mixer.update(delta);
     if (dragonMixer) dragonMixer.update(delta);
@@ -1591,9 +1637,9 @@ function animate() {
             gameState.shouldCreateDragonFlame = false;
         }
         
-        // 炎エフェクトの数をデバッグ表示（100フレームに1回）
+        // エフェクト数をデバッグ表示（100フレームに1回）
         if (frameCount % 100 === 0) {
-            // console.log(`ドラゴンの炎エフェクト数: ${gameState.dragonFlameEffects.length}`);
+            // console.log(`エフェクト数 - ドラゴン炎: ${gameState.dragonFlameEffects.length}, 煙: ${gameState.dustEffects.length}, ビーム: ${gameState.beamEffects.length}, 草: ${gameState.grassSprites.length}`);
             
             // 炎エフェクトが存在する場合、最初のエフェクトの情報を表示
             if (gameState.dragonFlameEffects.length > 0) {
@@ -1636,6 +1682,26 @@ function animate() {
         }
         
         if (gameState.currentHealth < gameState.playerHealth && isInHealingArea) {
+            // 回復中フラグを設定
+            if (!gameState.isHealing) {
+                gameState.isHealing = true;
+                
+                // 回復音を再生
+                if (gameState.sounds.heal && gameState.sounds.heal.buffer) {
+                    if (gameState.sounds.heal.isPlaying) {
+                        gameState.sounds.heal.stop();
+                    }
+                    gameState.sounds.heal.play();
+                }
+            }
+            
+            // 回復パーティクルを生成（初回のみ）
+            if (!gameState.healingParticles) {
+                console.log('回復パーティクル生成を開始します');
+                createHealingParticles(gameState, scene);
+                console.log('回復パーティクル生成完了:', gameState.healingParticles);
+            }
+            
             // 魔法陣エリア内では一定間隔で回復
             gameState.healingTimer--;
             if (gameState.healingTimer <= 0) {
@@ -1650,6 +1716,49 @@ function animate() {
         } else {
             // エリア外では回復タイマーをリセット
             gameState.healingTimer = gameState.healingInterval;
+            
+            // 回復中フラグをリセット
+            if (gameState.isHealing) {
+                gameState.isHealing = false;
+                // 回復パーティクルを削除
+                if (gameState.healingParticles) {
+                    scene.remove(gameState.healingParticles);
+                    gameState.healingParticles.geometry.dispose();
+                    gameState.healingParticles.material.dispose();
+                    gameState.healingParticles = null;
+                }
+            }
+        }
+        
+        // 回復パーティクルのアニメーション更新
+        if (gameState.healingParticles && gameState.isHealing) {
+            // デバッグ情報を追加
+            if (frameCount % 60 === 0) { // 1秒毎にログ出力
+                console.log('ヒーリングパーティクル状態:');
+                console.log('- パーティクル存在:', !!gameState.healingParticles);
+                console.log('- シーンに追加済み:', scene.children.includes(gameState.healingParticles));
+                console.log('- マテリアル:', gameState.healingParticles.material);
+                console.log('- visible:', gameState.healingParticles.visible);
+                console.log('- プレイヤー位置:', gameState.playerPosition.x, gameState.playerPosition.y, gameState.playerPosition.z);
+            }
+            
+            // プレイヤーの位置に追従
+            const positions = gameState.healingParticles.geometry.attributes.position.array;
+            const playerPos = gameState.playerModel ? gameState.playerModel.position : gameState.playerPosition;
+            const time = frameCount * 0.05;
+            
+            for (let i = 0; i < positions.length; i += 3) {
+                const particleIndex = i / 3;
+                const angle = particleIndex * 0.2 + time;
+                const radius = 1.5 + Math.sin(angle * 1.5) * 0.3;
+                const height = Math.sin(angle * 2 + particleIndex) * 0.3;
+                
+                positions[i] = playerPos.x + Math.cos(angle) * radius;
+                positions[i + 1] = playerPos.y + 1.5 + height;
+                positions[i + 2] = playerPos.z + Math.sin(angle) * radius;
+            }
+            gameState.healingParticles.geometry.attributes.position.needsUpdate = true;
+            gameState.healingParticles.visible = true; // 確実に表示する
         }
         
         // 無敵時間の更新
@@ -1710,8 +1819,116 @@ for (let i = 0; i < 2; i++) { // 初期状態で2本の柱を生成（回復エ�
 // 黄色いパーティクルエフェクト（魔法陣）を生成
 // createYellowParticleEffect(gameState, scene);
 
+// 回復パーティクル生成関数
+function createHealingParticles(gameState, scene) {
+    const particleCount = 120; // パーティクル数を大幅に増加
+    const geometry = new THREE.BufferGeometry();
+    
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    // プレイヤーの現在位置を確実に取得
+    const playerPos = gameState.playerModel ? gameState.playerModel.position : gameState.playerPosition;
+    console.log('回復パーティクル生成位置:', playerPos.x, playerPos.y, playerPos.z);
+    
+    for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        
+        // プレイヤー周辺にランダム配置
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 0.5 + Math.random() * 1.5; // 半径を少し小さく
+        const height = Math.random() * 2; // 高さも調整
+        
+        positions[i3] = playerPos.x + Math.cos(angle) * radius;
+        positions[i3 + 1] = playerPos.y + 1 + height; // プレイヤーより少し上
+        positions[i3 + 2] = playerPos.z + Math.sin(angle) * radius;
+        
+        // より明るい蛍光緑色
+        colors[i3] = 0.2;     // 赤を抑制
+        colors[i3 + 1] = 1.0; // 緑を最大に
+        colors[i3 + 2] = 0.3; // 青を少し追加
+        
+        sizes[i] = 0.3 + Math.random() * 0.2; // サイズを大きく
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    // テクスチャを作成（より確実な表示のため）
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // より強く光る円を描画
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(200, 255, 200, 1)'); // 中心をより明るく
+    gradient.addColorStop(0.2, 'rgba(150, 255, 150, 0.9)'); // 内側も明るく
+    gradient.addColorStop(0.5, 'rgba(100, 255, 100, 0.7)'); // 中間部分
+    gradient.addColorStop(0.8, 'rgba(50, 255, 50, 0.4)'); // 外側
+    gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    const material = new THREE.PointsMaterial({
+        size: 5.0, // サイズを元に戻す
+        map: texture,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+        vertexColors: true,
+        opacity: 0.8, // 光る効果を強めるため少し濃く
+        sizeAttenuation: false // 距離による減衰をなくす
+    });
+    
+    const particles = new THREE.Points(geometry, material);
+    particles.renderOrder = 999; // 最前面で描画
+    particles.frustumCulled = false; // カメラから外れても描画
+    gameState.healingParticles = particles;
+    scene.add(particles);
+    console.log('ヒーリングパーティクル作成完了:', particles);
+}
+
 // リスタートボタンのセットアップ
 setupRestartButton(gameState, scene);
+
+// Informationモーダルのセットアップ
+function setupInfoModal() {
+    const infoButton = document.getElementById('infoButton');
+    const infoModal = document.getElementById('infoModal');
+    const closeModal = document.getElementById('closeModal');
+    
+    // Informationボタンクリックでモーダルを開く
+    infoButton.addEventListener('click', () => {
+        infoModal.style.display = 'flex';
+    });
+    
+    // 閉じるボタンでモーダルを閉じる
+    closeModal.addEventListener('click', () => {
+        infoModal.style.display = 'none';
+    });
+    
+    // モーダル背景クリックでも閉じる
+    infoModal.addEventListener('click', (e) => {
+        if (e.target === infoModal) {
+            infoModal.style.display = 'none';
+        }
+    });
+    
+    // ESCキーでモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && infoModal.style.display === 'flex') {
+            infoModal.style.display = 'none';
+        }
+    });
+}
+
+setupInfoModal();
 
 // スタートボタンとビデオ制御の機能
 function showGameScreen() {
@@ -1745,7 +1962,10 @@ function showGameScreen() {
     renderer.domElement.style.display = 'block';
     
     // UIを表示
-    document.getElementById('info').style.opacity = '1';
+    const infoElement = document.getElementById('info');
+    if (infoElement) {
+        infoElement.style.opacity = '1';
+    }
     
     gameState.gameStarted = true;
     gameState.videoPlaying = false;
