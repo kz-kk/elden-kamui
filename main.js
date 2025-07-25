@@ -187,6 +187,16 @@ const gameState = {
     yellowParticlePermanentColumn: true, // ドラゴン付近に常に存在する柱を設定
     yellowParticlePermanentAll: true, // すべての柱を永続的にする
     
+    // 回復エリア管理
+    healingAreaSpawnTimer: 0,
+    healingAreaSpawnInterval: 300, // 5秒間隔で新しい回復エリアを生成
+    healingAreaLifetime: 600, // 回復エリアの寿命（10秒）
+    maxHealingAreas: 2, // 同時に存在する最大回復エリア数
+    
+    // パフォーマンス管理
+    sceneCleanupTimer: 0,
+    sceneCleanupInterval: 600, // 10秒間隔でシーンクリーンアップ
+    
     // 岩の衝突判定関連
     rocks: [], // 岩のオブジェクトを保存する配列
     rockCollisionRadius: 1.5, // 岩の衝突判定の基本半径を1.5に調整
@@ -1605,12 +1615,20 @@ function animate() {
             // console.log(`現在体力: ${gameState.currentHealth}/${gameState.playerHealth}`);
         }
         
-        // 4つの魔法陣エリアにいるかチェック
-        const area1 = Math.abs(px - 10) < 3 && Math.abs(pz) < 3;
-        const area2 = Math.abs(px + 10) < 3 && Math.abs(pz) < 3;
-        const area3 = Math.abs(px) < 3 && Math.abs(pz - 10) < 3;
-        const area4 = Math.abs(px) < 3 && Math.abs(pz + 10) < 3;
-        const isInHealingArea = area1 || area2 || area3 || area4;
+        // 動的な魔法陣エリアにいるかチェック
+        let isInHealingArea = false;
+        if (gameState.particleColumnEffects) {
+            for (const column of gameState.particleColumnEffects) {
+                const distance = Math.sqrt(
+                    Math.pow(px - column.origin.x, 2) + 
+                    Math.pow(pz - column.origin.z, 2)
+                );
+                if (distance < 3) { // 半径3の範囲内で回復
+                    isInHealingArea = true;
+                    break;
+                }
+            }
+        }
         
         // デバッグ：エリア判定を表示
         if (isInHealingArea && frameCount % 10 === 0) {
@@ -1685,7 +1703,7 @@ camera.lookAt(new THREE.Vector3(0, -3.5, 0)); // キャラクターの頭部あ�
 animate();
 
 // ゲーム初期化後、最初の柱エフェクトを生成
-for (let i = 0; i < 4; i++) { // 初期状態で4本の柱を生成（回復エリア用）
+for (let i = 0; i < 2; i++) { // 初期状態で2本の柱を生成（回復エリア用）
     createParticleColumn(gameState, scene);
 }
 

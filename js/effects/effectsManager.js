@@ -90,12 +90,15 @@ export function updateAllEffects(gameState, scene) {
     // 霧エフェクトの更新
     updateFogEffects(gameState, scene);
 
-    // 粒子の柱エフェクトの生成タイミング管理（無効化）
-    // gameState.columnSpawnTimer++;
-    // if (gameState.columnSpawnTimer > gameState.columnSpawnInterval) {
-    //     createParticleColumn(gameState, scene);
-    //     gameState.columnSpawnTimer = 0;
-    // }
+    // 回復エリア（魔法陣）の生成タイミング管理
+    gameState.healingAreaSpawnTimer++;
+    if (gameState.healingAreaSpawnTimer > gameState.healingAreaSpawnInterval) {
+        // 現在の回復エリア数が最大数未満の場合のみ生成
+        if (gameState.particleColumnEffects.length < gameState.maxHealingAreas) {
+            createParticleColumn(gameState, scene);
+        }
+        gameState.healingAreaSpawnTimer = 0;
+    }
 
     // 粒子の柱エフェクトを更新
     for (let i = gameState.particleColumnEffects.length - 1; i >= 0; i--) {
@@ -121,4 +124,49 @@ export function updateAllEffects(gameState, scene) {
             yellowEffect.updatePositions();
         }
     }
+    
+    // 定期的なシーンクリーンアップ（パフォーマンス向上）
+    gameState.sceneCleanupTimer++;
+    if (gameState.sceneCleanupTimer >= gameState.sceneCleanupInterval) {
+        performSceneCleanup(gameState, scene);
+        gameState.sceneCleanupTimer = 0;
+    }
+}
+
+/**
+ * シーンのクリーンアップを実行してパフォーマンスを向上させる
+ * @param {Object} gameState - ゲームの状態オブジェクト
+ * @param {THREE.Scene} scene - Three.jsのシーンオブジェクト
+ */
+function performSceneCleanup(gameState, scene) {
+    console.log('シーンクリーンアップを実行中...');
+    
+    // 非表示またはnullのオブジェクトを削除
+    const objectsToRemove = [];
+    scene.traverse((object) => {
+        if (object.isMesh || object.isPoints) {
+            if (!object.visible || object.geometry === null || object.material === null) {
+                objectsToRemove.push(object);
+            }
+        }
+    });
+    
+    objectsToRemove.forEach(obj => {
+        scene.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+            if (Array.isArray(obj.material)) {
+                obj.material.forEach(mat => mat.dispose());
+            } else {
+                obj.material.dispose();
+            }
+        }
+    });
+    
+    // ガベージコレクション強制実行の提案
+    if (window.gc) {
+        window.gc();
+    }
+    
+    console.log(`クリーンアップ完了: ${objectsToRemove.length}個のオブジェクトを削除`);
 } 

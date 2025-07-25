@@ -73,19 +73,12 @@ function createMagicCircleTexture() {
  * @returns {Object} 生成された柱エフェクトオブジェクト
  */
 export function createParticleColumn(gameState, scene) {
-    // 固定位置に配置（4つの回復エリア）
-    if (!gameState.healingPositions) {
-        gameState.healingPositions = [
-            new THREE.Vector3(10, gameState.groundLevel, 0),   // area1
-            new THREE.Vector3(-10, gameState.groundLevel, 0),  // area2
-            new THREE.Vector3(0, gameState.groundLevel, 10),   // area3
-            new THREE.Vector3(0, gameState.groundLevel, -10)   // area4
-        ];
-        gameState.currentHealingIndex = 0;
-    }
-    
-    const columnOrigin = gameState.healingPositions[gameState.currentHealingIndex].clone();
-    gameState.currentHealingIndex = (gameState.currentHealingIndex + 1) % 4;
+    // ランダムな位置に配置
+    const columnOrigin = new THREE.Vector3(
+        (Math.random() - 0.5) * 60, // -30 to 30の範囲
+        gameState.groundLevel,
+        (Math.random() - 0.5) * 60  // -30 to 30の範囲
+    );
     
     // 魔法陣を生成
     const magicCircleTexture = createMagicCircleTexture();
@@ -206,6 +199,8 @@ export function createParticleColumn(gameState, scene) {
         particleCount,
         origin: columnOrigin.clone(),
         time: 0,
+        lifetime: gameState.healingAreaLifetime || 600,
+        maxLifetime: gameState.healingAreaLifetime || 600,
         
         // パーティクルデータ
         positions,
@@ -288,6 +283,20 @@ export function createParticleColumn(gameState, scene) {
             
             this.geometry.attributes.position.needsUpdate = true;
             this.geometry.attributes.color.needsUpdate = true;
+            
+            // 寿命管理
+            this.lifetime--;
+            
+            // 寿命が尽きた場合はフェードアウト
+            if (this.lifetime <= 0) {
+                return false; // エフェクトを削除
+            }
+            
+            // 残り寿命が少ない場合は魔法陣をフェードアウト
+            if (this.lifetime < 60) { // 最後の1秒でフェードアウト
+                const fadeAlpha = this.lifetime / 60;
+                this.magicCircle.material.opacity = fadeAlpha;
+            }
             
             return true;
         },

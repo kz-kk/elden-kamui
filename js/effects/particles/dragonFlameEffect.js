@@ -183,13 +183,6 @@ export function createDragonFlameEffect(gameState, scene) {
             // 重力の影響を考慮した放物線の初期速度調整
             velocities[i3 + 1] += 0.1; // 上向きの初速を少し加える
             
-            // 遠距離攻撃の場合、一部のパーティクルを直接地面近くに生成
-            if (distanceToTarget > 20 && Math.random() < 0.3) {
-                positions[i3] = targetPos.x + (Math.random() - 0.5) * 10;
-                positions[i3 + 1] = gameState.groundLevel + 1 + Math.random() * 3;
-                positions[i3 + 2] = targetPos.z + (Math.random() - 0.5) * 10;
-                velocities[i3 + 1] = -0.05; // 下向きの速度
-            }
         } else {
             // 通常の速度設定
             const speed = 0.2 + Math.random() * 0.3;
@@ -203,10 +196,8 @@ export function createDragonFlameEffect(gameState, scene) {
         accelerations[i3 + 1] = -0.015; // 重力をより強く
         accelerations[i3 + 2] = 0;
         
-        // 寿命設定（距離に応じて延長）
-        const distanceToGround = Math.max(0, flameOrigin.y - gameState.groundLevel);
-        const distanceToPlayer = flameOrigin.distanceTo(gameState.playerPosition);
-        const baseDuration = Math.max(120, 60 + distanceToGround * 10 + distanceToPlayer * 2);
+        // 寿命設定
+        const baseDuration = 60 + Math.random() * 30;
         maxLifetimes[i] = baseDuration;
         lifetimes[i] = baseDuration;
         
@@ -263,7 +254,7 @@ export function createDragonFlameEffect(gameState, scene) {
                 // プレイヤー方向への速度を強める
                 const spreadSpeed = 0.2 + Math.random() * 0.1; // 速度を上げる
                 velocities[i3] = toPlayer.x * spreadSpeed;
-                velocities[i3 + 1] = 0.02; // わずかな上向きの速度
+                velocities[i3 + 1] = 0.01; // わずかな上向きの速度
                 velocities[i3 + 2] = toPlayer.z * spreadSpeed;
                 
                 // プレイヤーに近いほど速度を上げる
@@ -272,15 +263,15 @@ export function createDragonFlameEffect(gameState, scene) {
                     Math.pow(positions[i3 + 2] - gameState.playerPosition.z, 2)
                 );
                 
-                if (distToPlayer < 8.0) { // 検知距離を広げる
-                    const speedMultiplier = 1.0 + (8.0 - distToPlayer) / 4.0;
+                if (distToPlayer < 6.0) { // 検知距離を縮小
+                    const speedMultiplier = 1.0 + (6.0 - distToPlayer) / 8.0; // 速度増加を抑制
                     velocities[i3] *= speedMultiplier;
                     velocities[i3 + 2] *= speedMultiplier;
                     
-                    // プレイヤーが近い場合、より積極的に追尾
+                    // プレイヤーが近い場合の速度も制限
                     if (distToPlayer < 3.0) {
-                        velocities[i3] = toPlayer.x * (0.4 + Math.random() * 0.2);
-                        velocities[i3 + 2] = toPlayer.z * (0.4 + Math.random() * 0.2);
+                        velocities[i3] = toPlayer.x * (0.15 + Math.random() * 0.1); // 速度を大幅に抑制
+                        velocities[i3 + 2] = toPlayer.z * (0.15 + Math.random() * 0.1);
                     }
                 }
                 
@@ -359,6 +350,7 @@ export function createDragonFlameEffect(gameState, scene) {
         geometry: particleGeometry,
         material: flameMaterial,
         lifetime: 120, // エフェクト全体の寿命
+        groundReachTime: null, // 地面到達時刻を記録
         currentLife: 0,
         originPosition: dragonPosition.clone(), // 元のドラゴン位置を保持
         originRotation: dragonRotation, // 元のドラゴン向きを保持
@@ -480,6 +472,25 @@ export function createDragonFlameEffect(gameState, scene) {
             this.geometry.attributes.rotation.needsUpdate = true;
             this.geometry.attributes.isGroundFlame.needsUpdate = true;
             this.geometry.attributes.initialDelay.needsUpdate = true;
+            
+            // 地面到達から一定時間経過後にfrustumCulledを元に戻す
+            let hasGroundFlames = false;
+            for (let i = 0; i < particleCount; i++) {
+                if (isGroundFlame[i] > 0) {
+                    hasGroundFlames = true;
+                    break;
+                }
+            }
+            
+            if (hasGroundFlames && !this.groundReachTime) {
+                this.groundReachTime = this.currentLife;
+            }
+            
+            // 地面到達から60フレーム（1秒）経過後にfrustumCulledを戻す
+            if (this.groundReachTime && (this.currentLife - this.groundReachTime) > 60) {
+                this.particles.frustumCulled = true;
+                // console.log("地面の炎が安定、frustumCulled復元");
+            }
         }
     };
     
@@ -502,11 +513,13 @@ export function updateDragonFlameEffects(gameState, scene) {
         
         // エフェクトの寿命が切れたら削除
         if (flame.currentLife >= flame.lifetime) {
+            // frustumCulledを元に戻してから削除
+            flame.particles.frustumCulled = true;
             scene.remove(flame.particles);
             flame.geometry.dispose();
             flame.material.dispose();
             gameState.dragonFlameEffects.splice(i, 1);
-            // console.log("ドラゴン炎エフェクト消滅");
+            // console.log("ドラゴン炎エフェクト消滅、frustumCulledリセット");
         }
     }
 } 
