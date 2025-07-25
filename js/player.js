@@ -1,6 +1,7 @@
 /**
  * プレイヤーとドラゴンの無敵時間を管理するモジュール
  */
+import { showWinScreen } from './ui.js';
 
 /**
  * 無敵時間を更新する関数
@@ -184,8 +185,12 @@ export function checkYellowParticleHealing(gameState) {
  * @param {number} amount - ダメージ量
  */
 export function applyDragonDamage(gameState, amount) {
+    console.log(`applyDragonDamage関数が呼び出されました。ダメージ量: ${amount}, ドラゴン体力: ${gameState.currentDragonHealth}`);
     // ドラゴンが無敵状態ならダメージを与えない
-    if (gameState.isDragonInvincible) return;
+    if (gameState.isDragonInvincible) {
+        console.log('ドラゴンは無敵状態です');
+        return;
+    }
     
     // 体力を減らす
     gameState.currentDragonHealth -= amount;
@@ -193,6 +198,7 @@ export function applyDragonDamage(gameState, amount) {
     
     // 体力が0以下になったらドラゴン撃破
     if (gameState.currentDragonHealth <= 0) {
+        console.log('ドラゴンの体力が0以下になりました');
         gameState.currentDragonHealth = 0;
         gameState.isDragonDefeated = true;
         
@@ -200,7 +206,12 @@ export function applyDragonDamage(gameState, amount) {
         if (gameState.dragonModel) {
             // ドラゴンを非表示にする（または撃破アニメーションを再生）
             gameState.dragonModel.visible = false;
+            console.log('ドラゴンを非表示にしました');
         }
+        
+        // 勝利画面を表示
+        console.log('showWinScreen関数を呼び出します');
+        showWinScreen(gameState);
         
         // console.log("ドラゴンを撃破した！");
         return;

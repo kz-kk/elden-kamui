@@ -1,6 +1,7 @@
 // ビームエフェクト関連の機能を提供するモジュール
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.module.js';
 import { applyDragonDamage } from '../../player.js';
+import { showWinScreen } from '../../ui.js';
 
 /**
  * ビーム用のテクスチャを生成する関数
@@ -450,6 +451,9 @@ export function createBeamEffect(gameState, scene) {
                                     // ドラゴンを非表示にする
                                     gameState.dragonModel.visible = false;
                                 }
+                                
+                                // 勝利画面を表示
+                                showWinScreen(gameState);
                                 
                                 // console.log("ドラゴンを撃破した！");
                             } else {

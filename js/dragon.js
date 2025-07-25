@@ -256,4 +256,24 @@ export function updateDragon(gameState) {
         const cooldownReduction = Math.max(1, Math.min(2, 20 / distanceToPlayer));
         gameState.dragonFlameCooldown -= cooldownReduction;
     }
+    
+    // ドラゴンボイス処理
+    if (gameState.dragonVoiceCooldown <= 0) {
+        // 確率でドラゴンボイスを再生
+        if (Math.random() < gameState.dragonVoiceChance) {
+            if (gameState.sounds.dragonVoice && gameState.sounds.dragonVoice.buffer) {
+                if (gameState.sounds.dragonVoice.isPlaying) {
+                    gameState.sounds.dragonVoice.stop();
+                }
+                gameState.sounds.dragonVoice.play();
+                console.log('ドラゴンボイス再生: dragon-voice1.mp3');
+            }
+            
+            // クールダウンをリセット
+            gameState.dragonVoiceCooldown = gameState.dragonVoiceMaxCooldown;
+        }
+    } else {
+        // クールダウンを減少
+        gameState.dragonVoiceCooldown--;
+    }
 } 

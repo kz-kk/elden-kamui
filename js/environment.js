@@ -7,8 +7,8 @@ import { PMREMGenerator } from 'three';
 
 // 草を生やす関数
 export function addGrass(scene, gameState) {
-    // 草の数と配置範囲（軽量化のため大幅に削減）
-    const grassCount = 1000; // 草の数を5000から1000に削減
+    // 草の数と配置範囲（メモリ最適化のため大幅に削減）
+    const grassCount = 300; // 草の数をさらに削減
     const areaSize = 30;
     
     // 草の色のバリエーション（画像に色を乗算）
@@ -158,7 +158,7 @@ export function addGrass(scene, gameState) {
                 // 草のインスタンスを作成
                 for (let i = 0; i < currentBatchSize; i++) {
                     // ランダムなサイズを決定
-                    const size = Math.random() * 3.0 + 0.5; // サイズはやや大きく
+                    const size = Math.random() * 1.5 + 0.3; // サイズを小さく
                     
                     // クラスタリングを考慮したランダムな位置
                     let x, z;

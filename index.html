@@ -26,7 +26,7 @@
         /* Informationボタン */
         #infoButton {
             position: absolute;
-            top: 70px;
+            bottom: 30px;
             right: 20px;
             width: 40px;
             height: 40px;
@@ -96,20 +96,25 @@
         }
         
         #closeModal {
-            background: #d4af37;
-            color: black;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-size: 16px;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: "Times New Roman", serif;
             font-weight: bold;
+            background: linear-gradient(45deg, #d4af37, #f4d03f, #d4af37);
+            color: #1a1a1a;
+            border: 3px solid #b8860b;
+            border-radius: 10px;
             cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+            letter-spacing: 2px;
             margin-top: 20px;
-            transition: background 0.3s ease;
         }
         
         #closeModal:hover {
-            background: #f4d03f;
+            background: linear-gradient(45deg, #f4d03f, #d4af37, #f4d03f);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
         }
         #loading {
             position: absolute;
@@ -186,18 +191,66 @@
         }
         #restartButton {
             margin-top: 30px;
-            padding: 15px 30px;
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 5px;
+            padding: 15px 40px;
             font-size: 24px;
-            font-family: serif;
+            font-family: "Times New Roman", serif;
+            font-weight: bold;
+            background: linear-gradient(45deg, #d4af37, #f4d03f, #d4af37);
+            color: #1a1a1a;
+            border: 3px solid #b8860b;
+            border-radius: 10px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+            letter-spacing: 2px;
         }
         #restartButton:hover {
-            background-color: #c0392b;
+            background: linear-gradient(45deg, #f4d03f, #d4af37, #f4d03f);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 勝利画面のスタイル */
+        #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 64px;
+            font-weight: 400;
+            font-family: "Times New Roman", serif;
+            text-shadow: 4px 4px 8px black;
+            display: none;
+            z-index: 1001;
+        }
+        
+        #winButton {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: "Times New Roman", serif;
+            font-weight: bold;
+            background: linear-gradient(45deg, #d4af37, #f4d03f, #d4af37);
+            color: #1a1a1a;
+            border: 3px solid #b8860b;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+            letter-spacing: 2px;
+        }
+        
+        #winButton:hover {
+            background: linear-gradient(45deg, #f4d03f, #d4af37, #f4d03f);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
         }
         
         /* カメラボタンのスタイル */
@@ -205,13 +258,13 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             background-color: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 50%;
             cursor: pointer;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
@@ -353,7 +406,7 @@
         /* 下部配置用のコンテナ */
         #bottomControls {
             position: absolute;
-            bottom: 80px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
@@ -391,10 +444,10 @@
                 <h3 style="color: #d4af37;">日本語</h3>
                 <div class="controls-list">
                     • 矢印キー: 移動<br>
-                    • C キー: カメラ切り替え<br>
-                    • R キー: ローリング<br>
+                    • C キー: カメラ切り替え(追随/自由視点)<br>
+                    • R キー: ローリング回避<br>
                     • F キー: 攻撃<br>
-                    • マウス: カメラ回転（自由視点モード）
+                    • マウス: カメラ回転（自由視点モードのみ）
                 </div>
             </div>
             
@@ -403,7 +456,7 @@
                 <div class="controls-list">
                     • Arrow keys: Move<br>
                     • C key: Camera switching<br>
-                    • R key: Rolling<br>
+                    • R key: Rolling avoidance<br>
                     • F key: Attack<br>
                     • Mouse: Camera rotation (Free view mode)
                 </div>
@@ -447,6 +500,12 @@
     <div id="gameOverScreen">
         <div>GAME OVER</div>
         <button id="restartButton">Restart</button>
+    </div>
+    
+    <!-- 勝利画面 -->
+    <div id="winScreen">
+        <div>You Win</div>
+        <button id="winButton">Restart</button>
     </div>
     
     <!-- カメラボタン -->

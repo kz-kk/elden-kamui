@@ -172,4 +172,49 @@ export function setupRestartButton(gameState, scene) {
     document.getElementById('restartButton').addEventListener('click', function() {
         restartGame(gameState, scene);
     });
+}
+
+/**
+ * 勝利画面を表示する関数
+ * @param {Object} gameState - ゲームの状態オブジェクト
+ */
+export function showWinScreen(gameState) {
+    console.log('showWinScreen関数が呼び出されました');
+    // 勝利画面を表示
+    const winScreen = document.getElementById('winScreen');
+    console.log('winScreen element:', winScreen);
+    if (winScreen) {
+        winScreen.style.display = 'flex';
+        console.log('勝利画面を表示しました');
+    } else {
+        console.error('winScreen要素が見つかりません');
+    }
+    
+    // ドラゴンの体力バーを非表示
+    const dragonContainer = document.getElementById('dragonHealthContainer');
+    if (dragonContainer) {
+        dragonContainer.style.display = 'none';
+    }
+    
+    console.log("You Win!");
+}
+
+/**
+ * 勝利画面のリスタートボタンのイベントリスナーを設定する関数
+ * @param {Object} gameState - ゲームの状態オブジェクト
+ * @param {THREE.Scene} scene - Three.jsのシーンオブジェクト
+ */
+export function setupWinButton(gameState, scene) {
+    document.getElementById('winButton').addEventListener('click', function() {
+        // 勝利画面を非表示
+        document.getElementById('winScreen').style.display = 'none';
+        
+        // ドラゴンの体力バーを再表示
+        const dragonContainer = document.getElementById('dragonHealthContainer');
+        if (dragonContainer) {
+            dragonContainer.style.display = 'block';
+        }
+        
+        restartGame(gameState, scene);
+    });
 } 

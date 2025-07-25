@@ -28,8 +28,8 @@ export function updateAllEffects(gameState, scene) {
         gameState.dustSpawnTimer--;
     }
     
-    // 草の揺れを更新（一旦コメントアウト）
-    // updateGrassWind(gameState);
+    // 草の揺れを更新
+    updateGrassWind(gameState);
     
     // 各炎エフェクトを更新
     for (let i = gameState.flameEffects.length - 1; i >= 0; i--) {

@@ -12,7 +12,7 @@ import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap } from './js/e
 import { analyzeAnimation } from './js/animation.js';
 
 // UI関連のインポート
-import { updateHealthBar, updateDragonHealthBar, gameOver, restartGame, setupRestartButton } from './js/ui.js';
+import { updateHealthBar, updateDragonHealthBar, gameOver, restartGame, setupRestartButton, showWinScreen, setupWinButton } from './js/ui.js';
 import { updateInvincibility, applyDamage, applyDragonDamage } from './js/player.js';
 import { checkCollisions } from './js/collision.js';
 
@@ -92,7 +92,7 @@ const gameState = {
     dragonHealth: 500, // ドラゴンの最大体力
     currentDragonHealth: 500, // ドラゴンの現在の体力
     isDragonInvincible: false, // ドラゴンの無敵状態
-    dragonInvincibleTime: 30, // ドラゴンの無敵時間（フレーム単位）
+    dragonInvincibleTime: 5, // ドラゴンの無敵時間（フレーム単位）を短縮
     dragonInvincibleTimer: 0, // ドラゴンの無敵タイマー
     dragonDamageFlashTimer: 0, // ドラゴンのダメージ時の点滅タイマー
     isDragonDefeated: false, // ドラゴン撃破フラグ
@@ -145,6 +145,12 @@ const gameState = {
     dragonFlameWidth: 2.5, // ドラゴンの炎の幅をさらに減少
     dragonFlameSpread: 0.15, // ドラゴンの炎の広がりをさらに減少
     dragonFlameSpeed: 0.45, // ドラゴンの炎の前進速度を少し上げる
+    
+    // ドラゴンボイス関連のパラメータ
+    dragonVoiceCooldown: 0, // ドラゴンボイスのクールダウン時間
+    dragonVoiceMaxCooldown: 300, // ドラゴンボイスの最大クールダウン時間（フレーム単位：約5秒）
+    dragonVoiceChance: 0.005, // 各フレームでドラゴンがボイスを発する確率
+    
     // 足元の煙エフェクト関連のパラメータ
     dustEffects: [], // 煙エフェクトを管理する配列
     dustLifetime: 25, // 煙エフェクトの寿命（フレーム単位）
@@ -296,6 +302,15 @@ directionalLight.position.set(5, 10, 7.5);
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.width = 2048;
 directionalLight.shadow.mapSize.height = 2048;
+
+// 影のカメラ範囲を設定してドラゴンも含むようにする
+directionalLight.shadow.camera.near = 0.1;
+directionalLight.shadow.camera.far = 50;
+directionalLight.shadow.camera.left = -30;
+directionalLight.shadow.camera.right = 30;
+directionalLight.shadow.camera.top = 30;
+directionalLight.shadow.camera.bottom = -30;
+
 scene.add(directionalLight);
 
 // 戦士モデル専用のポイントライト - モデルの質感を引き立てる
@@ -329,6 +344,7 @@ try {
 // 地面の作成
 const groundGeometry = new THREE.PlaneGeometry(100, 100);
 const groundTexture = new THREE.TextureLoader().load('assets/area/dry_grassland.png');
+// const groundTexture = new THREE.TextureLoader().load('assets/area/tsuchi.jpg');
 groundTexture.wrapS = THREE.RepeatWrapping;
 groundTexture.wrapT = THREE.RepeatWrapping;
 groundTexture.repeat.set(10, 10);
@@ -347,8 +363,8 @@ ground.position.y = -5.0; // 地面をさらに下げる
 ground.receiveShadow = true;
 scene.add(ground);
 
-// 草を生やす関数（一旦コメントアウト）
-// addGrass(scene, gameState);
+// 草を生やす関数（メモリ最適化済み）
+addGrass(scene, gameState);
 
 // 岩を配置
 addRocks(scene, gameState);
@@ -1073,6 +1089,18 @@ function initializeAudio() {
                 console.error('回復音読み込みエラー:', error);
             });
 
+            // ドラゴンボイス
+            const dragonVoiceSound = new Audio(audioListener);
+            audioLoader.load('assets/sound/dragon-voice2.mp3', (buffer) => {
+                dragonVoiceSound.setBuffer(buffer);
+                dragonVoiceSound.setLoop(false);
+                dragonVoiceSound.setVolume(0.8);
+                gameState.sounds.dragonVoice = dragonVoiceSound;
+                console.log('ドラゴンボイス読み込み成功');
+            }, null, (error) => {
+                console.error('ドラゴンボイス読み込みエラー:', error);
+            });
+
             // キー入力の処理
             window.addEventListener('keydown', (e) => {
                 gameState.keysPressed[e.key] = true;
@@ -1183,7 +1211,7 @@ function initializeAudio() {
                             // ドラゴンにダメージを与える
                             if (!gameState.isDragonInvincible) {
                                 // 既にインポートされているapplyDragonDamage関数を使用
-                                applyDragonDamage(gameState, 10); // 10ダメージ
+                                applyDragonDamage(gameState, 1000); // 100ダメージ（テスト用に増加）
                             }
                         }
                     }
@@ -1812,7 +1840,7 @@ camera.lookAt(new THREE.Vector3(0, -3.5, 0)); // キャラクターの頭部あ�
 animate();
 
 // ゲーム初期化後、最初の柱エフェクトを生成
-for (let i = 0; i < 2; i++) { // 初期状態で2本の柱を生成（回復エリア用）
+for (let i = 0; i < 3; i++) { // 初期状態で3本の柱を生成（回復エリア用）
     createParticleColumn(gameState, scene);
 }
 
@@ -1896,6 +1924,9 @@ function createHealingParticles(gameState, scene) {
 
 // リスタートボタンのセットアップ
 setupRestartButton(gameState, scene);
+
+// 勝利ボタンのセットアップ
+setupWinButton(gameState, scene);
 
 // Informationモーダルのセットアップ
 function setupInfoModal() {
