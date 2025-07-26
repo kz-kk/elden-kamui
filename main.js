@@ -960,7 +960,7 @@ if (loader) {
                                     const newMat = child.material.clone();
                                     // 光沢をなくし、明るさのみ調整
                                     newMat.roughness = 1.0; // 完全にマットな表面
-                                    newMat.metalness = 1.0; // 金属感をなくす
+                                    newMat.metalness = 0.0; // 金属感をなくす
                                     newMat.envMapIntensity = 0.0; // 環境マップの影響をなくす
                                     newMat.color.multiplyScalar(1.3); // 色を50%明るく
                                     newMat.side = THREE.DoubleSide;
