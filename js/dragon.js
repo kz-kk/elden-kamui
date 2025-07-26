@@ -34,7 +34,7 @@ export function updateDragon(gameState) {
     if (!gameState.dragonOrbitAngle) {
         gameState.dragonOrbitAngle = 0;
         gameState.dragonOrbitRadius = 15; // プレイヤーからの距離
-        gameState.dragonOrbitSpeed = 0.005; // 周回速度を大幅に減少（0.02→0.005）
+        gameState.dragonOrbitSpeed = 0.008; // 周回速度を大幅に減少（0.02→0.005）
         gameState.dragonHoverHeight = -2.0; // 基本飛行高度
         gameState.dragonHoverAmplitude = 2.0; // 上下動の振幅を減少（2.0→1.0）
         gameState.dragonHoverFrequency = 0.1; // 上下動の周波数を減少（0.15→0.03）

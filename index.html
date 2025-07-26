@@ -25,7 +25,7 @@
         }
         /* Informationボタン */
         #infoButton {
-            position: absolute;
+            position: fixed;
             bottom: 30px;
             right: 20px;
             width: 40px;
@@ -41,7 +41,7 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
-            z-index: 100;
+            z-index: 1100;
         }
         
         #infoButton:hover {
@@ -60,7 +60,7 @@
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            z-index: 1200;
         }
         
         #infoContent {
@@ -72,6 +72,7 @@
             color: white;
             text-align: center;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            font-family: serif;
         }
         
         #infoContent h2 {
@@ -79,6 +80,7 @@
             margin-bottom: 20px;
             font-size: 24px;
             text-shadow: 2px 2px 4px black;
+            font-family: serif;
         }
         
         .language-section {
@@ -87,12 +89,14 @@
             border: 1px solid #444;
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.3);
+            font-family: serif;
         }
         
         .controls-list {
             text-align: left;
             line-height: 1.8;
             font-size: 16px;
+            font-family: serif;
         }
         
         #closeModal {
@@ -419,6 +423,37 @@
             flex: 1;
         }
         
+        /* ミュートボタンのスタイル */
+        #muteButton {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #d4af37;
+            border-radius: 50%;
+            color: #d4af37;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 1100;
+        }
+        
+        #muteButton:hover {
+            background: rgba(212, 175, 55, 0.2);
+            transform: scale(1.1);
+        }
+        
+        #muteButton.muted {
+            color: rgba(212, 175, 55, 0.3);
+            text-decoration: line-through;
+        }
+        
         /* モバイル対応 - 968px以下でsplash_spに切り替え */
         @media screen and (max-width: 968px) {
             #startScreen {
@@ -435,6 +470,9 @@
     <!-- Information button -->
     <button id="infoButton">i</button>
     
+    <!-- ミュートボタン -->
+    <button id="muteButton" title="音声オン/オフ">♪</button>
+    
     <!-- Information modal -->
     <div id="infoModal">
         <div id="infoContent">
@@ -443,7 +481,7 @@
             <div class="language-section">
                 <h3 style="color: #d4af37;">日本語</h3>
                 <div class="controls-list">
-                    • 矢印キー: 移動<br>
+                    • 矢印キー上: 前進  左右: 回転<br>
                     • C キー: カメラ切り替え(追随/自由視点)<br>
                     • R キー: ローリング回避<br>
                     • F キー: 攻撃<br>
@@ -454,7 +492,7 @@
             <div class="language-section">
                 <h3 style="color: #d4af37;">English</h3>
                 <div class="controls-list">
-                    • Arrow keys: Move<br>
+                    • Up: Forward Left/Right: Turn<br>
                     • C key: Camera switching<br>
                     • R key: Rolling avoidance<br>
                     • F key: Attack<br>

@@ -12,8 +12,9 @@ export function playFootstepSound(gameState) {
         if (gameState.sounds.footstep.isPlaying) {
             gameState.sounds.footstep.stop();
         }
-        // 音量をランダムに少し変化させる（自然な感じに）
-        gameState.sounds.footstep.setVolume(0.4 + Math.random() * 0.2);
+        // ミュート状態の場合は音量を0に、そうでなければランダムに変化させる
+        const volume = gameState.isMuted ? 0 : (0.4 + Math.random() * 0.2);
+        gameState.sounds.footstep.setVolume(volume);
         // 再生速度も少しランダムに（ピッチ変化）
         gameState.sounds.footstep.setPlaybackRate(0.9 + Math.random() * 0.2);
         // 再生

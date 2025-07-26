@@ -115,8 +115,8 @@ const gameState = {
     flameMaxCooldown: 20, // 炎エフェクト発動の最大クールダウン時間（フレーム単位）
     flameDistance: 25.0, // 炎エフェクトの射程距離
     flameLifetime: 60, // 炎エフェクトの寿命（フレーム単位）
-    flameSize: 0.2, // 粒子の大きさ
-    flameParticleCount: 600, // 粒子の数（密度を上げる）
+    flameSize: 0.1, // 粒子の大きさ
+    flameParticleCount: 700, // 粒子の数（密度を上げる）
     flameSpeed: 0.18, // 炎の前進速度
     flameWidth: 1.5, // 炎の幅
     flameSpread: 0.4, // 炎の広がり（値が大きいほど広がる）
@@ -162,6 +162,18 @@ const gameState = {
     sounds: {}, // 効果音を保存するオブジェクト
     isMoving: false,
     footstepTimer: 0,
+    // デフォルト音量設定
+    defaultVolumes: {
+        bgm: 0.5,
+        wind: 0.6,
+        attack: 0.7,
+        footstep: 0.5,
+        fire: 0.4,
+        patipati: 0.9,
+        heal: 1.0,
+        dragonVoice: 0.8,
+        rolling: 0.8
+    },
     // ... 他のパラメータは維持 ...
     
     // 霧エフェクト用のパラメータ
@@ -214,7 +226,7 @@ const gameState = {
     // 地面の炎エフェクト関連のパラメータ
     groundFireEffects: [], // 地面の炎エフェクトを管理する配列
     groundFireLifetime: 180, // 地面の炎の寿命（フレーム単位）
-    groundFireSize: 0.15, // 地面の炎の粒子の大きさ
+    groundFireSize: 0.05, // 地面の炎の粒子の大きさ
     groundFireParticleCount: 120, // 地面の炎の粒子の数
     groundFireSpreadRadius: 1.5, // 地面の炎の広がり半径
     groundFireHeight: 3.2, // 地面の炎の高さ
@@ -226,6 +238,9 @@ const gameState = {
     healingTimer: 30, // 体力回復のタイマー（初期値を間隔と同じに設定）
     healingInterval: 30, // 体力回復の間隔（フレーム単位）
     healingAmount: 3, // 1回の回復量を増加
+    
+    // グローバルミュート状態
+    isMuted: false, // ゲーム全体のミュート状態
 };
 
 // シーン、カメラ、レンダラーの設定
@@ -253,6 +268,40 @@ controls.maxPolarAngle = Math.PI / 2; // 地面より下にカメラが行かな
 controls.enabled = true;
 gameState.freeCamera = false;
 gameState.followPlayerCamera = true; // 初期はキャラクター追随モード
+
+// ミュートボタンのイベントリスナー
+const muteButton = document.getElementById('muteButton');
+muteButton.addEventListener('click', () => {
+    gameState.isMuted = !gameState.isMuted;
+    
+    if (gameState.isMuted) {
+        // すべての音声をミュート
+        if (bgmSound) bgmSound.setVolume(0);
+        if (windSound) windSound.setVolume(0);
+        // すべてのサウンドエフェクトもミュート
+        Object.values(gameState.sounds).forEach(sound => {
+            if (sound && sound.setVolume) {
+                sound.setVolume(0);
+            }
+        });
+        // 動画もミュート
+        const introVideo = document.getElementById('introVideo');
+        if (introVideo) introVideo.muted = true;
+        
+        muteButton.classList.add('muted');
+        muteButton.textContent = '♪';
+    } else {
+        // 音声を復活（デフォルト音量を使用）
+        if (bgmSound) bgmSound.setVolume(gameState.defaultVolumes.bgm);
+        if (windSound) windSound.setVolume(gameState.defaultVolumes.wind);
+        // 動画のミュートも解除
+        const introVideo = document.getElementById('introVideo');
+        if (introVideo) introVideo.muted = false;
+        
+        muteButton.classList.remove('muted');
+        muteButton.textContent = '♪';
+    }
+});
 
 // カメラボタンのイベントリスナー
 const cameraButton = document.getElementById('cameraButton');
@@ -294,22 +343,26 @@ cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切
 // document.body.appendChild(cameraInfo);
 
 // 光源の設定
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // 環境光を0.4に上げる
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // 環境光を少し暗くして影を目立たせる
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // メイン光源を0.8に上げる
-directionalLight.position.set(5, 10, 7.5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // メイン光源を1.0に強化
+directionalLight.position.set(5, 15, 7.5); // 高い位置に配置して影を長くする
 directionalLight.castShadow = true;
-directionalLight.shadow.mapSize.width = 2048;
-directionalLight.shadow.mapSize.height = 2048;
+directionalLight.shadow.mapSize.width = 4096; // 影の解像度を向上
+directionalLight.shadow.mapSize.height = 4096;
 
 // 影のカメラ範囲を設定してドラゴンも含むようにする
 directionalLight.shadow.camera.near = 0.1;
-directionalLight.shadow.camera.far = 50;
-directionalLight.shadow.camera.left = -30;
-directionalLight.shadow.camera.right = 30;
-directionalLight.shadow.camera.top = 30;
-directionalLight.shadow.camera.bottom = -30;
+directionalLight.shadow.camera.far = 60;
+directionalLight.shadow.camera.left = -40;
+directionalLight.shadow.camera.right = 40;
+directionalLight.shadow.camera.top = 40;
+directionalLight.shadow.camera.bottom = -40;
+
+// 影の品質設定
+directionalLight.shadow.bias = -0.0005; // 影のちらつきを防ぐ
+directionalLight.shadow.normalBias = 0.02;
 
 scene.add(directionalLight);
 
@@ -769,7 +822,7 @@ if (loader) {
                                 // カメラ関連変数は遷移処理で管理するのでここではクリアしない
                                 
                                 // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
-                                const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
+                                const isMoving = gameState.keysPressed['ArrowUp']; // || gameState.keysPressed['ArrowDown'];
                                 if (isMoving && playerAnimations['run']) {
                                     // 待機モデルを非表示
                                     gameState.playerModel.visible = false;
@@ -874,11 +927,11 @@ if (loader) {
                     // 実際のモデルを設定
                     gameState.dragonModel = gltf.scene;
                     // ドラゴンのサイズを設定
-                    gameState.dragonModel.scale.set(15, 15, 15);
+                    gameState.dragonModel.scale.set(20.5, 20.5, 20.5); // 1.5倍に拡大
                     // 初期位置を空中に設定
                     gameState.dragonModel.position.set(
                         gameState.playerPosition.x + 20, // プレイヤーから少し離れた位置
-                        -2.0, // 地面より上の空中に配置
+                        -3.0, // 地面より上の空中に配置
                         gameState.playerPosition.z
                     );
                     
@@ -899,7 +952,7 @@ if (loader) {
                                         newMat.roughness = 1.0; // 完全にマットな表面
                                         newMat.metalness = 0.0; // 金属感をなくす
                                         newMat.envMapIntensity = 0.0; // 環境マップの影響をなくす
-                                        newMat.color.multiplyScalar(1.5); // 色を50%明るく
+                                        newMat.color.multiplyScalar(1.3); // 色を50%明るく
                                         newMat.side = THREE.DoubleSide;
                                         return newMat;
                                     });
@@ -907,9 +960,9 @@ if (loader) {
                                     const newMat = child.material.clone();
                                     // 光沢をなくし、明るさのみ調整
                                     newMat.roughness = 1.0; // 完全にマットな表面
-                                    newMat.metalness = 0.0; // 金属感をなくす
+                                    newMat.metalness = 1.0; // 金属感をなくす
                                     newMat.envMapIntensity = 0.0; // 環境マップの影響をなくす
-                                    newMat.color.multiplyScalar(1.5); // 色を50%明るく
+                                    newMat.color.multiplyScalar(1.3); // 色を50%明るく
                                     newMat.side = THREE.DoubleSide;
                                     child.material = newMat;
                                 }
@@ -1014,7 +1067,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/music.mp3', (buffer) => {
                 bgmSound.setBuffer(buffer);
                 bgmSound.setLoop(true);
-                bgmSound.setVolume(0.5);
+                bgmSound.setVolume(gameState.isMuted ? 0 : 0.5);
             }, null, (error) => {
                 console.error('BGM読み込みエラー:', error);
             });
@@ -1024,7 +1077,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/wind.mp3', (buffer) => {
                 windSound.setBuffer(buffer);
                 windSound.setLoop(true);
-                windSound.setVolume(0.6);
+                windSound.setVolume(gameState.isMuted ? 0 : 0.6);
             }, null, (error) => {
                 console.error('環境音読み込みエラー:', error);
             });
@@ -1034,7 +1087,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/attach.mp3', (buffer) => {
                 attackSound.setBuffer(buffer);
                 attackSound.setLoop(false);
-                attackSound.setVolume(0.7);
+                attackSound.setVolume(gameState.isMuted ? 0 : 0.7);
                 gameState.sounds.attack = attackSound;
                 // console.log('攻撃音読み込み成功');
             }, null, (error) => {
@@ -1046,7 +1099,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/foot.mp3', (buffer) => {
                 footstepSound.setBuffer(buffer);
                 footstepSound.setLoop(false);
-                footstepSound.setVolume(0.5);
+                footstepSound.setVolume(gameState.isMuted ? 0 : 0.5);
                 gameState.sounds.footstep = footstepSound;
                 // console.log('足音読み込み成功');
             }, null, (error) => {
@@ -1058,7 +1111,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/fire.mp3', (buffer) => {
                 fireSound.setBuffer(buffer);
                 fireSound.setLoop(false);
-                fireSound.setVolume(0.4);
+                fireSound.setVolume(gameState.isMuted ? 0 : 0.4);
                 gameState.sounds.fire = fireSound;
                 // console.log('炎音読み込み成功');
             }, null, (error) => {
@@ -1070,7 +1123,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/patipati.mp3', (buffer) => {
                 patipatiSound.setBuffer(buffer);
                 patipatiSound.setLoop(false);
-                patipatiSound.setVolume(0.9);
+                patipatiSound.setVolume(gameState.isMuted ? 0 : 0.9);
                 gameState.sounds.patipati = patipatiSound;
                 // console.log('パチパチ音読み込み成功');
             }, null, (error) => {
@@ -1082,7 +1135,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/heal.mp3', (buffer) => {
                 healSound.setBuffer(buffer);
                 healSound.setLoop(false);
-                healSound.setVolume(1.0);
+                healSound.setVolume(gameState.isMuted ? 0 : 1.0);
                 gameState.sounds.heal = healSound;
                 // console.log('回復音読み込み成功');
             }, null, (error) => {
@@ -1094,7 +1147,7 @@ function initializeAudio() {
             audioLoader.load('assets/sound/dragon-voice2.mp3', (buffer) => {
                 dragonVoiceSound.setBuffer(buffer);
                 dragonVoiceSound.setLoop(false);
-                dragonVoiceSound.setVolume(0.8);
+                dragonVoiceSound.setVolume(gameState.isMuted ? 0 : 0.8);
                 gameState.sounds.dragonVoice = dragonVoiceSound;
                 console.log('ドラゴンボイス読み込み成功');
             }, null, (error) => {
@@ -1224,7 +1277,7 @@ function initializeAudio() {
                         // 移動中なら走りアニメーション、そうでなければ待機アニメーションに戻す
                         if (!currentAnimation) return;
                         
-                        const isMoving = gameState.keysPressed['ArrowUp'] || gameState.keysPressed['ArrowDown'];
+                        const isMoving = gameState.keysPressed['ArrowUp']; // || gameState.keysPressed['ArrowDown'];
                         if (isMoving && playerAnimations['run'] && playerAnimations['run'].action) {
                             if (typeof currentAnimation.stop === 'function') {
                                 currentAnimation.stop();
@@ -1346,7 +1399,7 @@ function movePlayer() {
 
     // 矢印キーが押されているかチェック
     const arrowKeyPressed = gameState.keysPressed['ArrowUp'] || 
-                           gameState.keysPressed['ArrowDown'] || 
+                           // gameState.keysPressed['ArrowDown'] || 
                            gameState.keysPressed['ArrowLeft'] || 
                            gameState.keysPressed['ArrowRight'];
     
@@ -1423,14 +1476,14 @@ function movePlayer() {
         moveDirectionZ = Math.cos(gameState.playerRotation);
         isMoving = true;
     }
-    if (gameState.keysPressed['ArrowDown']) {
-        // 後ろ方向に移動（向きは変えない）
-        gameState.playerPosition.x -= Math.sin(gameState.playerRotation) * gameState.playerSpeed;
-        gameState.playerPosition.z -= Math.cos(gameState.playerRotation) * gameState.playerSpeed;
-        moveDirectionX = -Math.sin(gameState.playerRotation);
-        moveDirectionZ = -Math.cos(gameState.playerRotation);
-        isMoving = true;
-    }
+    // if (gameState.keysPressed['ArrowDown']) {
+    //     // 後ろ方向に移動（向きは変えない）
+    //     gameState.playerPosition.x -= Math.sin(gameState.playerRotation) * gameState.playerSpeed;
+    //     gameState.playerPosition.z -= Math.cos(gameState.playerRotation) * gameState.playerSpeed;
+    //     moveDirectionX = -Math.sin(gameState.playerRotation);
+    //     moveDirectionZ = -Math.cos(gameState.playerRotation);
+    //     isMoving = true;
+    // }
 
     // 左右回転
     if (gameState.keysPressed['ArrowLeft']) {
@@ -1443,47 +1496,47 @@ function movePlayer() {
     }
     
     // ジャンプ処理
-    if (gameState.keysPressed[' '] && !gameState.isJumping) {
-        // スペースキーでジャンプ開始（地面または岩の上にいる場合のみ）
-        gameState.isJumping = true;
-        gameState.verticalVelocity = gameState.jumpSpeed;
-        
-        // 岩の上からジャンプする場合、現在の高さを基準にする
-        const startHeight = gameState.isOnRock ? gameState.playerPosition.y : gameState.groundLevel;
-        gameState.playerPosition.y = startHeight;
-        
-        // ジャンプアニメーションを再生（もし存在すれば）
-        if (mixer && jumpAction) {
-            jumpAction.reset();
-            jumpAction.play();
-            // console.log("ジャンプアニメーション再生");
-        }
-    }
+    // if (gameState.keysPressed[' '] && !gameState.isJumping) {
+    //     // スペースキーでジャンプ開始（地面または岩の上にいる場合のみ）
+    //     gameState.isJumping = true;
+    //     gameState.verticalVelocity = gameState.jumpSpeed;
+    //     
+    //     // 岩の上からジャンプする場合、現在の高さを基準にする
+    //     const startHeight = gameState.isOnRock ? gameState.playerPosition.y : gameState.groundLevel;
+    //     gameState.playerPosition.y = startHeight;
+    //     
+    //     // ジャンプアニメーションを再生（もし存在すれば）
+    //     if (mixer && jumpAction) {
+    //         jumpAction.reset();
+    //         jumpAction.play();
+    //         // console.log("ジャンプアニメーション再生");
+    //     }
+    // }
     
     // ジャンプ中の処理
-    if (gameState.isJumping) {
-        // 重力の影響を適用
-        gameState.verticalVelocity -= gameState.gravity;
-        
-        // 垂直方向の移動
-        gameState.playerPosition.y += gameState.verticalVelocity;
-        
-        // 地面に着地したかチェック
-        if (gameState.playerPosition.y <= gameState.groundLevel && !gameState.isOnRock) {
-            gameState.playerPosition.y = gameState.groundLevel;
-            gameState.isJumping = false;
-            gameState.verticalVelocity = 0;
-            
-            // 着地アニメーションを再生（もし存在すれば）
-            if (mixer && idleAction) {
-                idleAction.reset();
-                idleAction.play();
-            }
-        }
-    }
+    // if (gameState.isJumping) {
+    //     // 重力の影響を適用
+    //     gameState.verticalVelocity -= gameState.gravity;
+    //     
+    //     // 垂直方向の移動
+    //     gameState.playerPosition.y += gameState.verticalVelocity;
+    //     
+    //     // 地面に着地したかチェック
+    //     if (gameState.playerPosition.y <= gameState.groundLevel && !gameState.isOnRock) {
+    //         gameState.playerPosition.y = gameState.groundLevel;
+    //         gameState.isJumping = false;
+    //         gameState.verticalVelocity = 0;
+    //         
+    //         // 着地アニメーションを再生（もし存在すれば）
+    //         if (mixer && idleAction) {
+    //             idleAction.reset();
+    //             idleAction.play();
+    //         }
+    //     }
+    // }
     
     // 足音の再生（矢印キーが押されているときのみ）
-    if (arrowKeyPressed && !gameState.isJumping && !isRollingAnimationPlaying && !gameState.isAttacking) {
+    if (arrowKeyPressed && /*!gameState.isJumping &&*/ !isRollingAnimationPlaying && !gameState.isAttacking) {
         // 足音タイマーをチェック
         if (!gameState.footstepTimer || gameState.footstepTimer <= 0) {
             playFootstepSound(gameState);
@@ -1528,7 +1581,7 @@ function movePlayer() {
     
     // アニメーションを移動状態に応じて切り替え
     if (playerAnimations['wait'] && playerAnimations['run'] && !isRollingAnimationPlaying && !gameState.isAttacking) {
-        if (isMoving && !gameState.isJumping && 
+        if (isMoving && /*!gameState.isJumping &&*/ 
             (currentAnimation !== playerAnimations['run'].action || 
              (typeof playerAnimations['run'] === 'object' && playerAnimations['run'].action && 
               currentAnimation !== playerAnimations['run'].action))) {
@@ -1569,7 +1622,7 @@ function movePlayer() {
                 // console.log("プレイヤーの位置:", gameState.playerPosition.toArray());
             }
             
-        } else if (!isMoving && !gameState.isJumping && 
+        } else if (!isMoving && /*!gameState.isJumping &&*/ 
                    (typeof playerAnimations['run'] === 'object' && playerAnimations['run'].action && 
                     currentAnimation === playerAnimations['run'].action)) {
             // 待機アニメーションに切り替え
@@ -2109,6 +2162,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // ビデオを表示して再生開始
             introVideo.style.display = 'block';
             gameState.videoPlaying = true;
+            
+            // ミュート状態を動画にも適用
+            introVideo.muted = gameState.isMuted;
             
             // ビデオイベントを設定
             setupVideoEvents();
