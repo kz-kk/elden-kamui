@@ -25,7 +25,7 @@ export function addGrass(scene, gameState) {
     const textureLoader = new THREE.TextureLoader();
     
     // 明示的に指定されたパス
-    const grassTexturePath = 'assets/area/grass.png';
+    const grassTexturePath = './assets/area/grass.png';
     let grassTexture = null;
     
     // console.log(`草のテクスチャ読み込み開始: ${grassTexturePath}`);
@@ -386,7 +386,7 @@ export function addRocks(scene, gameState) {
     
     // 岩のモデルを読み込む
     loader.load(
-        'assets/area/weathered_rock.glb', // 岩のモデルパス
+        './assets/area/weathered_rock.glb', // 岩のモデルパス
         function(gltf) {
             // console.log("岩のモデル読み込み成功");
             
@@ -548,7 +548,7 @@ export function addRocks(scene, gameState) {
             // モデルのパスが間違っている可能性があるため別のパスも試す
             // console.log("別のパスで岩のモデルの読み込みを試みます...");
             loader.load(
-                'assets/rocks/weathered_rock.glb', // 代替パス
+                './assets/rocks/weathered_rock.glb', // 代替パス
                 function(gltf) {
                     // console.log("代替パスから岩のモデル読み込み成功");
                     // 読み込んだモデルをテンプレートとして使用
