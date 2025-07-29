@@ -39,6 +39,10 @@ import {
 // エフェクト管理モジュールをインポート
 import { updateAllEffects } from './js/effects/effectsManager.js';
 
+// GLSLライトニングシステムをインポート
+import { GLSLLightningSystem } from './js/glslLightningSystem.js';
+import { GLContext } from './js/glContext.js';
+
 // ゲームの状態管理
 const gameState = {
     playerSpeed: 0.1,
@@ -168,8 +172,8 @@ const gameState = {
         wind: 0.6,
         attack: 0.7,
         footstep: 0.5,
-        fire: 0.4,
-        patipati: 0.9,
+        fire: 0.25,
+        patipati: 0.6,
         heal: 1.0,
         dragonVoice: 0.8,
         rolling: 0.8
@@ -232,6 +236,8 @@ const gameState = {
     groundFireHeight: 3.2, // 地面の炎の高さ
     groundFireDamage: 20, // 地面の炎のダメージ量を大幅に増加
     shouldCreateDragonFlame: false, // ドラゴンの炎エフェクト生成フラグ
+    shouldCreateDragonLightning: false, // ドラゴンの雷エフェクト生成フラグ
+    dragonLightningTarget: null, // 雷攻撃のターゲット位置
     isOnRock: false, // 岩の上にいるかどうか
     
     // 体力回復関連のパラメータ
@@ -255,6 +261,40 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウマッ
 // 最初はcanvasを非表示にする
 renderer.domElement.style.display = 'none';
 document.body.appendChild(renderer.domElement);
+
+// GLSLライトニングシステムの初期化
+const particleCanvas = document.getElementById('particleCanvas');
+let glslLightningSystem = null;
+console.log("particleCanvas取得:", particleCanvas);
+if (particleCanvas) {
+    // キャンバスの設定とスタイルの確認
+    particleCanvas.width = window.innerWidth;
+    particleCanvas.height = window.innerHeight;
+    particleCanvas.style.position = 'absolute';
+    particleCanvas.style.top = '0';
+    particleCanvas.style.left = '0';
+    particleCanvas.style.pointerEvents = 'none';
+    particleCanvas.style.zIndex = '10';
+    // particleCanvas.style.backgroundColor = 'rgba(255, 0, 0, 0.1)'; // テスト用：薄い赤色背景（削除）
+    
+    console.log("particleCanvasスタイル:", {
+        position: particleCanvas.style.position,
+        zIndex: particleCanvas.style.zIndex,
+        width: particleCanvas.width,
+        height: particleCanvas.height,
+        display: particleCanvas.style.display
+    });
+    
+    console.log("GLContext初期化開始");
+    const gl = GLContext.init(particleCanvas);
+    console.log("GLContext初期化結果:", gl);
+    GLContext.resize(window.innerWidth, window.innerHeight);
+    console.log("GLSLLightningSystem作成開始");
+    glslLightningSystem = new GLSLLightningSystem(2000);
+    console.log("GLSLLightningSystem作成完了:", glslLightningSystem);
+} else {
+    console.error("particleCanvasが見つかりません");
+}
 
 // OrbitControlsの設定（マウスドラッグでカメラ操作用）
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -1063,6 +1103,9 @@ function initializeAudio() {
         bgmSound = new Audio(audioListener);
         const audioLoader = new AudioLoader();
         
+        // グローバルに参照できるようにする
+        window.audioLoader = audioLoader;
+        
         if (audioLoader) {
             audioLoader.load('./assets/sound/music.mp3', (buffer) => {
                 bgmSound.setBuffer(buffer);
@@ -1111,7 +1154,7 @@ function initializeAudio() {
             audioLoader.load('./assets/sound/fire.mp3', (buffer) => {
                 fireSound.setBuffer(buffer);
                 fireSound.setLoop(false);
-                fireSound.setVolume(gameState.isMuted ? 0 : 0.4);
+                fireSound.setVolume(gameState.isMuted ? 0 : 0.25);
                 gameState.sounds.fire = fireSound;
                 // console.log('炎音読み込み成功');
             }, null, (error) => {
@@ -1123,7 +1166,7 @@ function initializeAudio() {
             audioLoader.load('./assets/sound/patipati.mp3', (buffer) => {
                 patipatiSound.setBuffer(buffer);
                 patipatiSound.setLoop(false);
-                patipatiSound.setVolume(gameState.isMuted ? 0 : 0.9);
+                patipatiSound.setVolume(gameState.isMuted ? 0 : 0.6);
                 gameState.sounds.patipati = patipatiSound;
                 // console.log('パチパチ音読み込み成功');
             }, null, (error) => {
@@ -1152,6 +1195,28 @@ function initializeAudio() {
                 console.log('ドラゴンボイス読み込み成功');
             }, null, (error) => {
                 console.error('ドラゴンボイス読み込みエラー:', error);
+            });
+
+            // 雷音
+            const thunderSound = new Audio(audioListener);
+            console.log('雷音ファイル読み込み開始: ./assets/sound/thunder_sequence.mp3');
+            audioLoader.load('./assets/sound/thunder_sequence.mp3', (buffer) => {
+                thunderSound.setBuffer(buffer);
+                thunderSound.setLoop(false);
+                thunderSound.setVolume(gameState.isMuted ? 0 : 0.7);
+                gameState.sounds.thunder = thunderSound;
+                console.log('雷音読み込み成功:', {
+                    hasBuffer: !!buffer,
+                    duration: buffer ? buffer.duration : 'unknown',
+                    volume: thunderSound.getVolume()
+                });
+            }, null, (error) => {
+                console.error('雷音読み込みエラー:', error);
+                // 代替音として他の音を使用
+                if (gameState.sounds.attack) {
+                    console.log('代替音として攻撃音を使用');
+                    gameState.sounds.thunder = gameState.sounds.attack;
+                }
             });
 
             // キー入力の処理
@@ -1195,13 +1260,27 @@ function initializeAudio() {
                         }
                         gameState.sounds.footstep.setVolume(1.0);
                         gameState.sounds.footstep.play();
-                        console.log('foot.mp3再生');
                     }
                 }
                 
                 // 体力回復テスト（Tキー）
                 if (e.key === 't' || e.key === 'T') {
                     gameState.currentHealth = Math.min(gameState.currentHealth + 10, gameState.playerHealth);
+                }
+                
+                // 雷音テスト（Lキー）- thunder_sequence.mp3を使用
+                if (e.key === 'l' || e.key === 'L') {
+                    console.log('雷音テスト開始（thunder_sequence.mp3使用）');
+                    if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
+                        console.log('雷音を直接再生テスト');
+                        if (gameState.sounds.thunder.isPlaying) {
+                            gameState.sounds.thunder.stop();
+                        }
+                        gameState.sounds.thunder.setVolume(0.7);
+                        gameState.sounds.thunder.play();
+                    } else {
+                        console.warn('雷音が利用できません');
+                    }
                 }
                 
                 // デバッグ情報表示（Pキー）
@@ -1389,6 +1468,7 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    GLContext.resize(window.innerWidth, window.innerHeight);
 });
 
 
@@ -1673,6 +1753,9 @@ function animate() {
         return;
     }
 
+    // GLSLライトニングシステムの更新
+    glslLightningSystem.update(delta);
+
     // ゲーム開始前は最小限の処理のみ実行
     if (!gameState.gameStarted) {
         renderer.render(scene, camera);
@@ -1716,6 +1799,64 @@ function animate() {
             createDragonFlameEffect(gameState, scene);
             // フラグをリセット
             gameState.shouldCreateDragonFlame = false;
+        }
+        
+        // ドラゴンの雷エフェクト生成フラグが立っていれば雷エフェクトを生成
+        if (gameState.shouldCreateDragonLightning) {
+            console.log("雷攻撃発動！", gameState.dragonPosition, gameState.dragonLightningTarget);
+            console.log("GLSLライトニングシステム状態:", glslLightningSystem);
+            // GLSLライトニングシステムで雷攻撃を実行
+            if (gameState.dragonPosition && gameState.dragonLightningTarget && glslLightningSystem) {
+                // 雷撃の座標計算（頭上から落下）
+                const playerPos = gameState.playerPosition;
+                const targetPos = [gameState.dragonLightningTarget.x, gameState.dragonLightningTarget.y, gameState.dragonLightningTarget.z];
+                
+                // プレイヤーの真上から開始（高度50-80の間）
+                const lightningHeight = 50 + Math.random() * 30;
+                const startPos = [
+                    playerPos.x + (Math.random() - 0.5) * 10, // 少し横にずらす
+                    playerPos.y + lightningHeight, 
+                    playerPos.z + (Math.random() - 0.5) * 10
+                ];
+                
+                console.log("=== 落雷攻撃座標詳細 ===");
+                console.log("プレイヤー位置:", playerPos);
+                console.log("落雷開始位置:", startPos);
+                console.log("雷目標位置:", targetPos);
+                console.log("落雷高度:", lightningHeight);
+                console.log("========================");
+                
+                glslLightningSystem.strikeTarget(startPos, targetPos, 60);
+                
+                // 雷の音を再生（thunder_sequence.mp3を使用）
+                console.log("雷の音を再生するべき場所");
+                if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
+                    console.log("雷音（thunder_sequence.mp3）を再生");
+                    if (gameState.sounds.thunder.isPlaying) {
+                        gameState.sounds.thunder.stop();
+                    }
+                    gameState.sounds.thunder.setVolume(0.7); // 音量を調整
+                    gameState.sounds.thunder.play();
+                    console.log("雷音再生完了");
+                } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
+                    console.log("代替音として炎音を再生");
+                    if (gameState.sounds.fire.isPlaying) {
+                        gameState.sounds.fire.stop();
+                    }
+                    gameState.sounds.fire.setVolume(0.7);
+                    gameState.sounds.fire.play();
+                } else {
+                    console.warn("雷音が利用できません");
+                }
+            } else {
+                console.error("雷攻撃に必要な要素が不足:", {
+                    dragonPosition: !!gameState.dragonPosition,
+                    lightningTarget: !!gameState.dragonLightningTarget,
+                    glslSystem: !!glslLightningSystem
+                });
+            }
+            // フラグをリセット
+            gameState.shouldCreateDragonLightning = false;
         }
         
         // エフェクト数をデバッグ表示（100フレームに1回）
@@ -1778,9 +1919,7 @@ function animate() {
             
             // 回復パーティクルを生成（初回のみ）
             if (!gameState.healingParticles) {
-                console.log('回復パーティクル生成を開始します');
                 createHealingParticles(gameState, scene);
-                console.log('回復パーティクル生成完了:', gameState.healingParticles);
             }
             
             // 魔法陣エリア内では一定間隔で回復
@@ -1813,15 +1952,6 @@ function animate() {
         
         // 回復パーティクルのアニメーション更新
         if (gameState.healingParticles && gameState.isHealing) {
-            // デバッグ情報を追加
-            if (frameCount % 60 === 0) { // 1秒毎にログ出力
-                console.log('ヒーリングパーティクル状態:');
-                console.log('- パーティクル存在:', !!gameState.healingParticles);
-                console.log('- シーンに追加済み:', scene.children.includes(gameState.healingParticles));
-                console.log('- マテリアル:', gameState.healingParticles.material);
-                console.log('- visible:', gameState.healingParticles.visible);
-                console.log('- プレイヤー位置:', gameState.playerPosition.x, gameState.playerPosition.y, gameState.playerPosition.z);
-            }
             
             // プレイヤーの位置に追従
             const positions = gameState.healingParticles.geometry.attributes.position.array;
@@ -1883,6 +2013,20 @@ function animate() {
     // レンダリング
     renderer.clear(); // シーンをクリア
     renderer.render(scene, camera);
+    
+    // GLSLライトニングシステムの更新とレンダリング
+    if (glslLightningSystem) {
+        // 雷のアニメーション更新
+        glslLightningSystem.update();
+        
+        // GLコンテキストをクリア（透明で）
+        GLContext.clear(0, 0, 0, 0);
+        
+        const projectionMatrix = camera.projectionMatrix.toArray();
+        const viewMatrix = camera.matrixWorldInverse.toArray();
+        
+        glslLightningSystem.render(projectionMatrix, viewMatrix);
+    }
 }
 
 // 初期カメラ位置の設定（追随モードに合わせて調整）
@@ -1911,7 +2055,7 @@ function createHealingParticles(gameState, scene) {
     
     // プレイヤーの現在位置を確実に取得
     const playerPos = gameState.playerModel ? gameState.playerModel.position : gameState.playerPosition;
-    console.log('回復パーティクル生成位置:', playerPos.x, playerPos.y, playerPos.z);
+    // console.log('回復パーティクル生成位置:', playerPos.x, playerPos.y, playerPos.z);
     
     for (let i = 0; i < particleCount; i++) {
         const i3 = i * 3;
@@ -1972,7 +2116,7 @@ function createHealingParticles(gameState, scene) {
     particles.frustumCulled = false; // カメラから外れても描画
     gameState.healingParticles = particles;
     scene.add(particles);
-    console.log('ヒーリングパーティクル作成完了:', particles);
+    // console.log('ヒーリングパーティクル作成完了:', particles);
 }
 
 // リスタートボタンのセットアップ
@@ -2018,13 +2162,13 @@ setupInfoModal();
 function showGameScreen() {
     // ローディングが完了していない場合は待機
     if (gameState.isLoading) {
-        console.log('ローディング中のため、ゲーム画面表示を待機中...');
+        // console.log('ローディング中のため、ゲーム画面表示を待機中...');
         return;
     }
     
     // すでにゲームが開始されている場合は何もしない
     if (gameState.gameStarted) {
-        console.log('ゲームはすでに開始されています');
+        // console.log('ゲームはすでに開始されています');
         return;
     }
     

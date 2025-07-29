@@ -53,13 +53,16 @@ export function updateDragon(gameState) {
     gameState.dragonState.actionTimer++;
 
     // モード切り替えの判定
+    // console.log("ドラゴンモード:", gameState.dragonState.currentMode, "タイマー:", gameState.dragonState.actionTimer);
+    
     if (gameState.dragonState.currentMode === 'fly') {
         if (gameState.dragonState.actionTimer >= gameState.dragonState.flyDuration) {
             gameState.dragonState.flyCount++;
             gameState.dragonState.actionTimer = 0;
 
-            // 2回の飛行が完了したら待機モードへ
-            if (gameState.dragonState.flyCount >= 2) {
+            // 1回の飛行が完了したら待機モードへ（テスト用に短縮）
+            if (gameState.dragonState.flyCount >= 1) {
+                console.log("ドラゴンが待機モードに移行します！");
                 gameState.dragonState.currentMode = 'wait';
                 gameState.dragonState.flyCount = 0;
                 gameState.dragonState.waitCount = 0;
@@ -165,16 +168,16 @@ export function updateDragon(gameState) {
     const rotationSpeed = gameState.dragonState.currentMode === 'fly' ? 0.05 : 0.1;
     gameState.dragonModel.rotation.y += rotationDiff * rotationSpeed;
     
-    // ドラゴンの炎吹き出し処理
+    // ドラゴンの攻撃処理
     if (gameState.dragonFlameCooldown <= 0) {
-        // 待機モード時は炎を吐かない
-        if (gameState.dragonState.currentMode === 'wait') {
-            return;
-        }
+        // 飛行モード時は炎攻撃、待機モード時は雷攻撃
+        const isWaitMode = gameState.dragonState.currentMode === 'wait';
         
-
         // プレイヤーとの距離を計算
         const distanceToPlayer = dragonPosition.distanceTo(gameState.playerPosition);
+        
+        // デバッグ: 攻撃時のモード確認
+        console.log("ドラゴン攻撃実行 - モード:", gameState.dragonState.currentMode, "距離:", distanceToPlayer.toFixed(2));
         
         // 距離が近いほど攻撃確率を上げる
         const distanceMultiplier = Math.max(0.5, Math.min(2.0, 30 / distanceToPlayer));
@@ -185,8 +188,9 @@ export function updateDragon(gameState) {
             (Date.now() - gameState.gameStartTime >= 5000) && 
             gameState.dragonFlameCooldown <= 0;
         
-        // より積極的に攻撃を行う
-        if (shouldAttackAfter5Seconds || Math.random() < adjustedFlameChance || distanceToPlayer < 10) {
+        // より積極的に攻撃を行う（待機モード時は雷攻撃の確率を上げる）
+        const attackChance = isWaitMode ? adjustedFlameChance * 2 : adjustedFlameChance;
+        if (shouldAttackAfter5Seconds || Math.random() < attackChance || distanceToPlayer < 10) {
             // プレイヤーの現在位置を狙う
             const targetPosition = gameState.playerPosition.clone();
             
@@ -213,26 +217,10 @@ export function updateDragon(gameState) {
             const playerDirection = new THREE.Vector3();
             playerDirection.subVectors(targetPosition, mouthPosition).normalize();
             
-            // プレイヤー方向に炎を発射するための情報をセット
+            // プレイヤー方向に攻撃するための情報をセット
             gameState.dragonFlameTargetDirection = playerDirection.clone();
             gameState.dragonFlameOrigin = mouthPosition.clone();
             gameState.dragonFlameTargetPosition = targetPosition.clone();
-            
-            // 炎の効果音を再生
-            if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
-                if (gameState.sounds.fire.isPlaying) {
-                    gameState.sounds.fire.stop();
-                }
-                gameState.sounds.fire.play();
-            }
-            
-            // パチパチ音を再生
-            if (gameState.sounds.patipati && gameState.sounds.patipati.buffer) {
-                if (gameState.sounds.patipati.isPlaying) {
-                    gameState.sounds.patipati.stop();
-                }
-                gameState.sounds.patipati.play();
-            }
             
             // クールダウンをリセット（距離に応じて調整）
             const cooldownMultiplier = Math.max(0.5, Math.min(1.5, distanceToPlayer / 15));
@@ -241,14 +229,37 @@ export function updateDragon(gameState) {
                 gameState.dragonFlameMaxCooldown * 0.7 : gameState.dragonFlameMaxCooldown;
             gameState.dragonFlameCooldown = Math.floor(baseCooldown * cooldownMultiplier);
             
-            // console.log("ドラゴンがプレイヤーの現在位置めがけて炎を吹き出した！", 
-            //             "目標位置:", targetPosition.x.toFixed(2), targetPosition.y.toFixed(2), targetPosition.z.toFixed(2),
-            //             "距離:", distanceToPlayer.toFixed(2));
-            
-            // createDragonFlameEffect関数の呼び出しをmain.jsで行うためのフラグを設定
-            gameState.shouldCreateDragonFlame = true;
-            // 炎の目標がプレイヤーであることを明示
-            gameState.dragonFlameTargetPlayer = true;
+            // モードに応じて攻撃タイプを決定
+            if (isWaitMode) {
+                // 待機モード時は雷攻撃
+                console.log("ドラゴンが雷攻撃を準備中！待機モード");
+                gameState.shouldCreateDragonLightning = true;
+                // 雷の目標位置を設定
+                gameState.dragonLightningTarget = targetPosition.clone();
+                console.log("雷攻撃ターゲット設定:", targetPosition);
+            } else {
+                // 飛行モード時は炎攻撃
+                console.log("ドラゴンが炎攻撃を準備中！飛行モード");
+                gameState.shouldCreateDragonFlame = true;
+                // 炎の目標がプレイヤーであることを明示
+                gameState.dragonFlameTargetPlayer = true;
+                
+                // 炎の効果音を再生
+                if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
+                    if (gameState.sounds.fire.isPlaying) {
+                        gameState.sounds.fire.stop();
+                    }
+                    gameState.sounds.fire.play();
+                }
+                
+                // パチパチ音を再生
+                if (gameState.sounds.patipati && gameState.sounds.patipati.buffer) {
+                    if (gameState.sounds.patipati.isPlaying) {
+                        gameState.sounds.patipati.stop();
+                    }
+                    gameState.sounds.patipati.play();
+                }
+            }
         }
     } else {
         // クールダウンを減少（プレイヤーが近いほど早く減少）
@@ -266,7 +277,7 @@ export function updateDragon(gameState) {
                     gameState.sounds.dragonVoice.stop();
                 }
                 gameState.sounds.dragonVoice.play();
-                console.log('ドラゴンボイス再生: dragon-voice1.mp3');
+                // console.log('ドラゴンボイス再生: dragon-voice1.mp3');
             }
             
             // クールダウンをリセット

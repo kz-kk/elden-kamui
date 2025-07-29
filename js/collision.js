@@ -118,65 +118,6 @@ export function checkCollisions(gameState, isRollingAnimationPlaying) {
         }
     }
     
-    // プレイヤーのビームとドラゴンの衝突判定
-    // 注意: 新しいビームエフェクトでは、衝突判定はbeamEffect.js内で行われるため、
-    // ここでの処理は不要になりました。コメントアウトして残しておきます。
-    /*
-    if (gameState.dragonModel && gameState.beamEffects && gameState.beamEffects.length > 0) {
-        const dragonPos = gameState.dragonModel.position.clone();
-        const dragonRadius = 3.0; // ドラゴンの当たり判定の半径
-        
-        // 各ビームエフェクトをチェック
-        for (const beam of gameState.beamEffects) {
-            if (!beam.geometry || !beam.geometry.attributes || !beam.geometry.attributes.position) {
-                console.warn('Invalid beam geometry for collision check');
-                continue;
-            }
-            
-            const positions = beam.geometry.attributes.position.array;
-            const particleCount = positions.length / 3;
-            
-            // 各パーティクルとドラゴンの衝突をチェック
-            for (let i = 0; i < particleCount; i++) {
-                const particlePos = new THREE.Vector3(
-                    positions[i * 3],
-                    positions[i * 3 + 1],
-                    positions[i * 3 + 2]
-                );
-                
-                // 画面外に移動したパーティクルは無視
-                if (particlePos.x > 1000 || particlePos.y > 1000 || particlePos.z > 1000) {
-                    continue;
-                }
-                
-                const distance = particlePos.distanceTo(dragonPos);
-                
-                // 衝突判定
-                if (distance < dragonRadius) {
-                    console.log(`ビームとドラゴンの衝突を検出！距離: ${distance.toFixed(2)}`);
-                    
-                    // ドラゴンにダメージを与える
-                    if (typeof gameState.applyDragonDamage === 'function') {
-                        gameState.applyDragonDamage(gameState, 5); // 5ダメージ
-                    }
-                    
-                    // パーティクルを画面外に移動して非表示にする
-                    for (let j = 0; j < particleCount; j++) {
-                        positions[j * 3] = 2000;
-                        positions[j * 3 + 1] = 2000;
-                        positions[j * 3 + 2] = 2000;
-                    }
-                    
-                    // 位置情報の更新をGPUに通知
-                    beam.geometry.attributes.position.needsUpdate = true;
-                    
-                    // 一度衝突を検出したら、このビームの処理を終了
-                    break;
-                }
-            }
-        }
-    }
-    */
     
     // 無敵状態またはローリング中ならプレイヤーの衝突判定をスキップ
     if (gameState.isInvincible || gameState.isRolling || isRollingAnimationPlaying) {

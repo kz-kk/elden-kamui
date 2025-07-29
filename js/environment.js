@@ -368,7 +368,7 @@ export function addGrass(scene, gameState) {
             // 草の生成開始
             createGrassBatch();
             
-            console.log(`${grassCount}本の草の生成を開始しました...`);
+            // console.log(`${grassCount}本の草の生成を開始しました...`);
         }
     }
 }

@@ -34,7 +34,7 @@ export function toggleCameraMode(gameState, controls, camera, cameraInfo) {
         if (cameraInfo) {
             cameraInfo.innerHTML = 'カメラモード: 自由視点（遠景） (Cキーで切替)';
         }
-        console.log('カメラモード: 自由視点（遠景）');
+        // console.log('カメラモード: 自由視点（遠景）');
     } else {
         // 自由視点からキャラクター追随へ
         gameState.freeCamera = false;
@@ -53,7 +53,7 @@ export function toggleCameraMode(gameState, controls, camera, cameraInfo) {
         if (cameraInfo) {
             cameraInfo.innerHTML = 'カメラモード: キャラクター追随 (Cキーで切替)';
         }
-        console.log('カメラモード: キャラクター追随');
+        // console.log('カメラモード: キャラクター追随');
     }
 }
 
