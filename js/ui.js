@@ -170,6 +170,10 @@ export function restartGame(gameState, scene) {
  */
 export function setupRestartButton(gameState, scene) {
     document.getElementById('restartButton').addEventListener('click', function() {
+        // ボタンクリック音を再生
+        import('./sound.js').then(module => {
+            module.playButtonClickSound(gameState);
+        });
         restartGame(gameState, scene);
     });
 }
@@ -206,6 +210,11 @@ export function showWinScreen(gameState) {
  */
 export function setupWinButton(gameState, scene) {
     document.getElementById('winButton').addEventListener('click', function() {
+        // ボタンクリック音を再生
+        import('./sound.js').then(module => {
+            module.playButtonClickSound(gameState);
+        });
+        
         // 勝利画面を非表示
         document.getElementById('winScreen').style.display = 'none';
         

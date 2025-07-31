@@ -8,7 +8,7 @@ import { PMREMGenerator } from 'three';
 // 草を生やす関数
 export function addGrass(scene, gameState) {
     // 草の数と配置範囲（メモリ最適化のため大幅に削減）
-    const grassCount = 300; // 草の数をさらに削減
+    const grassCount = 150; // 草の数を大幅削減（パフォーマンス最適化）
     const areaSize = 30;
     
     // 草の色のバリエーション（画像に色を乗算）
@@ -142,8 +142,8 @@ export function addGrass(scene, gameState) {
             // 草の分布密度を上げるためのクラスタリング係数
             const clusterFactor = 0.9; // 高いほど密集する
             
-            // バッチ処理のパラメータ
-            const batchSize = 100;    // 一度に処理する草の数
+            // バッチ処理のパラメータ（軽量化）
+            const batchSize = 50;    // 一度に処理する草の数を削減
             let processed = 0;
             
             // 草をバッチ処理で生成する関数
@@ -158,7 +158,7 @@ export function addGrass(scene, gameState) {
                 // 草のインスタンスを作成
                 for (let i = 0; i < currentBatchSize; i++) {
                     // ランダムなサイズを決定
-                    const size = Math.random() * 1.5 + 0.3; // サイズを小さく
+                    const size = Math.random() * 2.5 + 1.0; // サイズを大きく（1.0～3.5）
                     
                     // クラスタリングを考慮したランダムな位置
                     let x, z;
@@ -185,32 +185,30 @@ export function addGrass(scene, gameState) {
                     const colorIndex = Math.floor(Math.random() * grassColors.length);
                     const color = grassColors[colorIndex];
                     
-                    // 色のランダム変動
-                    const colorVariation = 0.1; // 色のブレ幅
-                    const r = Math.max(0, Math.min(1, color.r + (Math.random() - 0.5) * colorVariation));
-                    const g = Math.max(0, Math.min(1, color.g + (Math.random() - 0.5) * colorVariation));
-                    const b = Math.max(0, Math.min(1, color.b + (Math.random() - 0.5) * colorVariation));
-                    const variedColor = new THREE.Color(r, g, b);
+                    // 色のランダム変動（最適化: 色バリエーションを簡略化）
+                    const variedColor = grassColors[Math.floor(Math.random() * grassColors.length)];
                     
                     if (gameState.useShaderGrass) {
                         // シェーダーベースの草を作成
-                        // 草の形状を定義（平面）
-                        const grassGeometry = new THREE.PlaneGeometry(1, 1);
+                        // 草の形状を定義（平面）- 共通のジオメトリを使用
+                        if (!gameState.sharedGrassGeometry) {
+                            gameState.sharedGrassGeometry = new THREE.PlaneGeometry(1, 1);
+                        }
                         
-                        // マテリアルをクローンして色を適用
+                        // マテリアルをクローンして色を適用（軽量化）
                         const material = gameState.grassShaderMaterial.clone();
                         material.uniforms.map.value = grassTexture;
                         material.uniforms.windPhase = { value: Math.random() * Math.PI * 2 }; // ランダムな位相
                         material.uniforms.color = { value: variedColor };
                         
-                        // メッシュを作成
-                        const grassMesh = new THREE.Mesh(grassGeometry, material);
+                        // メッシュを作成（共通ジオメトリを使用）
+                        const grassMesh = new THREE.Mesh(gameState.sharedGrassGeometry, material);
                         
                         // 位置を設定
                         grassMesh.position.set(x, -4.9, z);
                         
                         // サイズを設定
-                        grassMesh.scale.set(size * 0.5, size * (0.8 + Math.random() * 0.4), 1);
+                        grassMesh.scale.set(size * 0.8, size * (0.8 + Math.random() * 0.4), 1);
                         
                         // 回転を設定（Y軸周りのランダム回転）
                         grassMesh.rotation.y = Math.random() * Math.PI * 2;
@@ -278,8 +276,8 @@ export function addGrass(scene, gameState) {
             // 草の分布密度を上げるためのクラスタリング係数
             const clusterFactor = 0.7; // 高いほど密集する
             
-            // バッチ処理のパラメータ
-            const batchSize = 500;    // 一度に処理する草の数
+            // バッチ処理のパラメータ（軽量化）
+            const batchSize = 50;    // 一度に処理する草の数を削減
             let processed = 0;
             
             // 草をバッチ処理で生成する関数
@@ -294,7 +292,7 @@ export function addGrass(scene, gameState) {
                 // 草のインスタンスを作成
                 for (let i = 0; i < currentBatchSize; i++) {
                     // ランダムなサイズを決定
-                    const size = Math.random() * 1.5 + 0.5; // サイズはやや大きく
+                    const size = Math.random() * 2.5 + 1.0; // サイズを大きく（1.0～3.5）
                     
                     // クラスタリングを考慮したランダムな位置
                     let x, z;
@@ -321,14 +319,10 @@ export function addGrass(scene, gameState) {
                     const colorIndex = Math.floor(Math.random() * grassColors.length);
                     const color = grassColors[colorIndex];
                     
-                    // 色のランダム変動
-                    const colorVariation = 0.1; // 色のブレ幅
-                    const r = Math.max(0, Math.min(1, color.r + (Math.random() - 0.5) * colorVariation));
-                    const g = Math.max(0, Math.min(1, color.g + (Math.random() - 0.5) * colorVariation));
-                    const b = Math.max(0, Math.min(1, color.b + (Math.random() - 0.5) * colorVariation));
-                    const variedColor = new THREE.Color(r, g, b);
+                    // 色のランダム変動（最適化: 色バリエーションを簡略化）
+                    const variedColor = grassColors[Math.floor(Math.random() * grassColors.length)];
                     
-                    // 個別のマテリアルを作成（色のバリエーションのため）
+                    // 個別のマテリアルを作成（色のバリエーションのため）- 軽量化
                     const material = spriteMaterial.clone();
                     material.color = variedColor;
                     
@@ -707,19 +701,33 @@ export function addRocks(scene, gameState) {
 
 // 草の揺れを更新する関数
 export function updateGrassWind(gameState) {
-    // パフォーマンス向上のため、5フレームに1回だけ更新
+    // パフォーマンス向上のため、10フレームに1回だけ更新（さらに軽量化）
     if (!gameState.grassUpdateCounter) gameState.grassUpdateCounter = 0;
     gameState.grassUpdateCounter++;
-    if (gameState.grassUpdateCounter % 5 !== 0) return;
+    if (gameState.grassUpdateCounter % 10 !== 0) return;
     
     // 現在の時間を取得（風のアニメーションに使用）
     const time = performance.now() * 0.001;
     
+    // プレイヤーの位置を取得（距離カリング用）
+    const playerPos = gameState.playerModel ? gameState.playerModel.position : { x: 0, z: 0 };
+    const maxUpdateDistance = 25; // 25m以内の草のみアニメーション更新
+    const maxUpdateDistanceSquared = maxUpdateDistance * maxUpdateDistance;
+    
     // シェーダーベースの草の場合は時間パラメータを更新
     if (gameState.useShaderGrass && gameState.grassShaderMaterial) {
-        // 各草のメッシュを更新
+        // 各草のメッシュを更新（距離カリング適用）
         for (let i = 0; i < gameState.grassSprites.length; i++) {
             const grassMesh = gameState.grassSprites[i];
+            
+            // 距離カリング：プレイヤーから遠い草はスキップ
+            const dx = grassMesh.position.x - playerPos.x;
+            const dz = grassMesh.position.z - playerPos.z;
+            const distanceSquared = dx * dx + dz * dz;
+            
+            if (distanceSquared > maxUpdateDistanceSquared) {
+                continue; // 遠い草はアニメーション更新をスキップ
+            }
             
             // シェーダーマテリアルの時間パラメータを更新
             if (grassMesh.material && grassMesh.material.uniforms) {
@@ -734,13 +742,22 @@ export function updateGrassWind(gameState) {
             }
         }
     } else {
-        // 従来のスプライトベースの草の場合
+        // 従来のスプライトベースの草の場合（距離カリング適用）
         // 各草のスプライトを更新
         for (let i = 0; i < gameState.grassSprites.length; i++) {
             const sprite = gameState.grassSprites[i];
             const userData = sprite.userData;
             
             if (!userData) continue; // userData が設定されていない場合はスキップ
+            
+            // 距離カリング：プレイヤーから遠い草はスキップ
+            const dx = sprite.position.x - playerPos.x;
+            const dz = sprite.position.z - playerPos.z;
+            const distanceSquared = dx * dx + dz * dz;
+            
+            if (distanceSquared > maxUpdateDistanceSquared) {
+                continue; // 遠い草はアニメーション更新をスキップ
+            }
             
             // 風の効果を計算（サイン波で周期的な動き）
             const windEffect = Math.sin(time * gameState.windFrequency + userData.windPhase) * userData.windAmplitude;

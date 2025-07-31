@@ -20,7 +20,7 @@ import { checkCollisions } from './js/collision.js';
 import { toggleCameraMode, updateFollowCameraPosition, updateFollowCamera, updateCamera } from './js/camera.js';
 
 // サウンド関連のインポート
-import { playFootstepSound } from './js/sound.js';
+import { playFootstepSound, playButtonClickSound } from './js/sound.js';
 
 // ドラゴン関連のインポート
 import { updateDragon } from './js/dragon.js';
@@ -176,7 +176,9 @@ const gameState = {
         patipati: 0.6,
         heal: 1.0,
         dragonVoice: 0.8,
-        rolling: 0.8
+        rolling: 0.8,
+        thunder: 0.7,
+        buttonClick: 0.3
     },
     // ... 他のパラメータは維持 ...
     
@@ -238,6 +240,17 @@ const gameState = {
     shouldCreateDragonFlame: false, // ドラゴンの炎エフェクト生成フラグ
     shouldCreateDragonLightning: false, // ドラゴンの雷エフェクト生成フラグ
     dragonLightningTarget: null, // 雷攻撃のターゲット位置
+    lightningDamage: 10, // 雷のダメージ量
+    lightningDamageRadius: 8.0, // 雷のダメージ範囲（拡散に合わせて拡大）
+    lightningDamageActive: false, // 雷ダメージ判定のフラグ
+    lightningDamagePosition: null, // 雷の着弾位置
+    lightningDamageDuration: 60, // 雷ダメージの持続フレーム数
+    lightningDamageTimer: 0, // 雷ダメージのタイマー
+    lightningStrikeActive: false, // 落ちてくる雷のダメージ判定フラグ
+    lightningStrikePath: null, // 落ちてくる雷のパス（start, end）
+    lightningStrikeDuration: 30, // 落ちてくる雷のダメージ持続時間
+    lightningStrikeTimer: 0, // 落ちてくる雷のタイマー
+    lightningStrikeDamage: 15, // 落ちてくる雷のダメージ量
     isOnRock: false, // 岩の上にいるかどうか
     
     // 体力回復関連のパラメータ
@@ -265,7 +278,7 @@ document.body.appendChild(renderer.domElement);
 // GLSLライトニングシステムの初期化
 const particleCanvas = document.getElementById('particleCanvas');
 let glslLightningSystem = null;
-console.log("particleCanvas取得:", particleCanvas);
+// console.log("particleCanvas取得:", particleCanvas);
 if (particleCanvas) {
     // キャンバスの設定とスタイルの確認
     particleCanvas.width = window.innerWidth;
@@ -277,21 +290,21 @@ if (particleCanvas) {
     particleCanvas.style.zIndex = '10';
     // particleCanvas.style.backgroundColor = 'rgba(255, 0, 0, 0.1)'; // テスト用：薄い赤色背景（削除）
     
-    console.log("particleCanvasスタイル:", {
-        position: particleCanvas.style.position,
-        zIndex: particleCanvas.style.zIndex,
-        width: particleCanvas.width,
-        height: particleCanvas.height,
-        display: particleCanvas.style.display
-    });
+    // console.log("particleCanvasスタイル:", {
+    //     position: particleCanvas.style.position,
+    //     zIndex: particleCanvas.style.zIndex,
+    //     width: particleCanvas.width,
+    //     height: particleCanvas.height,
+    //     display: particleCanvas.style.display
+    // });
     
-    console.log("GLContext初期化開始");
+    // console.log("GLContext初期化開始");
     const gl = GLContext.init(particleCanvas);
-    console.log("GLContext初期化結果:", gl);
+    // console.log("GLContext初期化結果:", gl);
     GLContext.resize(window.innerWidth, window.innerHeight);
-    console.log("GLSLLightningSystem作成開始");
+    // console.log("GLSLLightningSystem作成開始");
     glslLightningSystem = new GLSLLightningSystem(2000);
-    console.log("GLSLLightningSystem作成完了:", glslLightningSystem);
+    // console.log("GLSLLightningSystem作成完了:", glslLightningSystem);
 } else {
     console.error("particleCanvasが見つかりません");
 }
@@ -312,6 +325,11 @@ gameState.followPlayerCamera = true; // 初期はキャラクター追随モー�
 // ミュートボタンのイベントリスナー
 const muteButton = document.getElementById('muteButton');
 muteButton.addEventListener('click', () => {
+    // ボタンクリック音を再生（ミュート前に）
+    if (!gameState.isMuted) {
+        playButtonClickSound(gameState);
+    }
+    
     gameState.isMuted = !gameState.isMuted;
     
     if (gameState.isMuted) {
@@ -334,6 +352,14 @@ muteButton.addEventListener('click', () => {
         // 音声を復活（デフォルト音量を使用）
         if (bgmSound) bgmSound.setVolume(gameState.defaultVolumes.bgm);
         if (windSound) windSound.setVolume(gameState.defaultVolumes.wind);
+        
+        // すべてのサウンドエフェクトの音量を復活
+        Object.entries(gameState.sounds).forEach(([soundName, sound]) => {
+            if (sound && sound.setVolume && gameState.defaultVolumes[soundName]) {
+                sound.setVolume(gameState.defaultVolumes[soundName]);
+            }
+        });
+        
         // 動画のミュートも解除
         const introVideo = document.getElementById('introVideo');
         if (introVideo) introVideo.muted = false;
@@ -346,6 +372,9 @@ muteButton.addEventListener('click', () => {
 // カメラボタンのイベントリスナー
 const cameraButton = document.getElementById('cameraButton');
 cameraButton.addEventListener('click', () => {
+    // ボタンクリック音を再生
+    playButtonClickSound(gameState);
+    
     // シネマティックモードのオン/オフを切り替え
     gameState.cinematicCamera = !gameState.cinematicCamera;
     
@@ -1192,29 +1221,38 @@ function initializeAudio() {
                 dragonVoiceSound.setLoop(false);
                 dragonVoiceSound.setVolume(gameState.isMuted ? 0 : 0.8);
                 gameState.sounds.dragonVoice = dragonVoiceSound;
-                console.log('ドラゴンボイス読み込み成功');
+        
             }, null, (error) => {
                 console.error('ドラゴンボイス読み込みエラー:', error);
             });
 
+            // ボタンクリック音
+            const buttonClickSound = new Audio(audioListener);
+    
+            audioLoader.load('./assets/sound/btn.mp3', (buffer) => {
+                buttonClickSound.setBuffer(buffer);
+                buttonClickSound.setLoop(false);
+                buttonClickSound.setVolume(gameState.isMuted ? 0 : 0.3);
+                gameState.sounds.buttonClick = buttonClickSound;
+
+            }, null, (error) => {
+                console.error('btn.mp3読み込みエラー:', error);
+            });
+
             // 雷音
             const thunderSound = new Audio(audioListener);
-            console.log('雷音ファイル読み込み開始: ./assets/sound/thunder_sequence.mp3');
+
             audioLoader.load('./assets/sound/thunder_sequence.mp3', (buffer) => {
                 thunderSound.setBuffer(buffer);
                 thunderSound.setLoop(false);
                 thunderSound.setVolume(gameState.isMuted ? 0 : 0.7);
                 gameState.sounds.thunder = thunderSound;
-                console.log('雷音読み込み成功:', {
-                    hasBuffer: !!buffer,
-                    duration: buffer ? buffer.duration : 'unknown',
-                    volume: thunderSound.getVolume()
-                });
+
             }, null, (error) => {
                 console.error('雷音読み込みエラー:', error);
                 // 代替音として他の音を使用
                 if (gameState.sounds.attack) {
-                    console.log('代替音として攻撃音を使用');
+
                     gameState.sounds.thunder = gameState.sounds.attack;
                 }
             });
@@ -1270,9 +1308,7 @@ function initializeAudio() {
                 
                 // 雷音テスト（Lキー）- thunder_sequence.mp3を使用
                 if (e.key === 'l' || e.key === 'L') {
-                    console.log('雷音テスト開始（thunder_sequence.mp3使用）');
                     if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
-                        console.log('雷音を直接再生テスト');
                         if (gameState.sounds.thunder.isPlaying) {
                             gameState.sounds.thunder.stop();
                         }
@@ -1443,7 +1479,7 @@ function initializeAudio() {
                         // 少し音量を上げてローリング音として再生
                         gameState.sounds.footstep.setVolume(0.8);
                         gameState.sounds.footstep.play();
-                        console.log('ローリング音（foot.mp3）再生開始');
+            
                     }
                     
                     // console.log("ローリングアニメーション開始 - 向いている方向に移動");
@@ -1803,50 +1839,63 @@ function animate() {
         
         // ドラゴンの雷エフェクト生成フラグが立っていれば雷エフェクトを生成
         if (gameState.shouldCreateDragonLightning) {
-            console.log("雷攻撃発動！", gameState.dragonPosition, gameState.dragonLightningTarget);
-            console.log("GLSLライトニングシステム状態:", glslLightningSystem);
+
             // GLSLライトニングシステムで雷攻撃を実行
             if (gameState.dragonPosition && gameState.dragonLightningTarget && glslLightningSystem) {
                 // 雷撃の座標計算（頭上から落下）
                 const playerPos = gameState.playerPosition;
                 const targetPos = [gameState.dragonLightningTarget.x, gameState.dragonLightningTarget.y, gameState.dragonLightningTarget.z];
                 
-                // プレイヤーの真上から開始（高度50-80の間）
-                const lightningHeight = 50 + Math.random() * 30;
+                // プレイヤーの真上から開始（高度30-50の間、より低く）
+                const lightningHeight = 30 + Math.random() * 20;
                 const startPos = [
-                    playerPos.x + (Math.random() - 0.5) * 10, // 少し横にずらす
+                    playerPos.x + (Math.random() - 0.5) * 3, // 横のずれを3単位に縮小（より正確に）
                     playerPos.y + lightningHeight, 
-                    playerPos.z + (Math.random() - 0.5) * 10
+                    playerPos.z + (Math.random() - 0.5) * 3
                 ];
                 
-                console.log("=== 落雷攻撃座標詳細 ===");
-                console.log("プレイヤー位置:", playerPos);
-                console.log("落雷開始位置:", startPos);
-                console.log("雷目標位置:", targetPos);
-                console.log("落雷高度:", lightningHeight);
-                console.log("========================");
+                // console.log("=== 落雷攻撃座標詳細 ===");
+                // console.log("プレイヤー位置:", playerPos);
+                // console.log("落雷開始位置:", startPos);
+                // console.log("雷目標位置:", targetPos);
+                // console.log("落雷高度:", lightningHeight);
+                // console.log("========================");
                 
                 glslLightningSystem.strikeTarget(startPos, targetPos, 60);
                 
+                // 落ちてくる雷のダメージ判定を設定
+                gameState.lightningStrikeActive = true;
+                gameState.lightningStrikePath = { start: startPos, end: targetPos };
+                gameState.lightningStrikeDuration = 30; // 30フレーム（0.5秒）
+                gameState.lightningStrikeTimer = gameState.lightningStrikeDuration;
+                gameState.lightningStrikeDamage = 15; // 落ちてくる雷のダメージ
+                
+                // 地面放電のダメージ判定はglslLightningSystem.jsのaddExplosionで設定される
+                
                 // 雷の音を再生（thunder_sequence.mp3を使用）
-                console.log("雷の音を再生するべき場所");
-                if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
-                    console.log("雷音（thunder_sequence.mp3）を再生");
-                    if (gameState.sounds.thunder.isPlaying) {
-                        gameState.sounds.thunder.stop();
+                // console.log("雷の音を再生するべき場所");
+                // ミュート状態でない場合のみ音声を再生
+                if (!gameState.isMuted) {
+                    if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
+                        // console.log("雷音（thunder_sequence.mp3）を再生");
+                        if (gameState.sounds.thunder.isPlaying) {
+                            gameState.sounds.thunder.stop();
+                        }
+                        gameState.sounds.thunder.setVolume(0.7); // 音量を調整
+                        gameState.sounds.thunder.play();
+                        // console.log("雷音再生完了");
+                    } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
+                        // console.log("代替音として炎音を再生");
+                        if (gameState.sounds.fire.isPlaying) {
+                            gameState.sounds.fire.stop();
+                        }
+                        gameState.sounds.fire.setVolume(0.7);
+                        gameState.sounds.fire.play();
+                    } else {
+                        console.warn("雷音が利用できません");
                     }
-                    gameState.sounds.thunder.setVolume(0.7); // 音量を調整
-                    gameState.sounds.thunder.play();
-                    console.log("雷音再生完了");
-                } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
-                    console.log("代替音として炎音を再生");
-                    if (gameState.sounds.fire.isPlaying) {
-                        gameState.sounds.fire.stop();
-                    }
-                    gameState.sounds.fire.setVolume(0.7);
-                    gameState.sounds.fire.play();
                 } else {
-                    console.warn("雷音が利用できません");
+    
                 }
             } else {
                 console.error("雷攻撃に必要な要素が不足:", {
@@ -2232,6 +2281,10 @@ function updateLoadingProgress(message) {
 function onLoadingComplete() {
     // console.log('ローディング完了');
     
+    // 音声を早期に初期化（STARTボタンクリック時に音声が使用可能になるように）
+    // console.log('音声の早期初期化を開始');
+    initializeAudio();
+    
     // STARTボタンを表示・有効化
     const startButton = document.getElementById('startButton');
     const loadingText = document.getElementById('loadingText');
@@ -2300,29 +2353,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // スタート画面を非表示
-            startScreen.style.display = 'none';
+            // ボタンクリック音を再生
+            // console.log('Startボタンがクリックされました');
+            // console.log('ボタンクリック音の状態:', {
+            //     hasButtonClick: !!(gameState.sounds && gameState.sounds.buttonClick),
+            //     hasBuffer: !!(gameState.sounds && gameState.sounds.buttonClick && gameState.sounds.buttonClick.buffer),
+            //     isMuted: gameState.isMuted
+            // });
+            playButtonClickSound(gameState);
             
-            // ビデオを表示して再生開始
-            introVideo.style.display = 'block';
-            gameState.videoPlaying = true;
+            // ボタンを無効化して重複クリックを防止
+            startButton.disabled = true;
+            startButton.textContent = 'Loading...';
             
-            // ミュート状態を動画にも適用
-            introVideo.muted = gameState.isMuted;
-            
-            // ビデオイベントを設定
-            setupVideoEvents();
-            
-            introVideo.play().then(() => {
-                // console.log('ビデオ再生開始');
-            }).catch((error) => {
-                console.error('ビデオ再生エラー:', error);
-                // ビデオ再生に失敗した場合は直接ゲーム開始
-                gameState.videoPlaying = false;
-                if (!gameState.gameStarted) {
-                    showGameScreen();
-                }
-            });
+            // 2秒待ってから動画画面に遷移
+            setTimeout(() => {
+                // スタート画面を非表示
+                startScreen.style.display = 'none';
+                
+                // ビデオを表示して再生開始
+                introVideo.style.display = 'block';
+                gameState.videoPlaying = true;
+                
+                // ミュート状態を動画にも適用
+                introVideo.muted = gameState.isMuted;
+                
+                // ビデオイベントを設定
+                setupVideoEvents();
+                
+                introVideo.play().then(() => {
+    
+                }).catch((error) => {
+                    console.error('ビデオ再生エラー:', error);
+                    // ビデオ再生に失敗した場合は直接ゲーム開始
+                    gameState.videoPlaying = false;
+                    if (!gameState.gameStarted) {
+                        showGameScreen();
+                    }
+                });
+            }, 1000); // 2秒（2000ミリ秒）の遅延
         });
     }
 });

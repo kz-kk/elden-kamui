@@ -239,4 +239,82 @@ export function checkCollisions(gameState, isRollingAnimationPlaying) {
             }
         }
     }
+    
+    // ローリング中は雷ダメージを受けない
+    if (!isRollingAnimationPlaying) {
+        // 落ちてくる雷との衝突判定
+        if (gameState.lightningStrikeActive && gameState.lightningStrikePath) {
+            // 雷のパス（線分）とプレイヤーの距離を計算
+            const startPos = new THREE.Vector3(
+                gameState.lightningStrikePath.start[0],
+                gameState.lightningStrikePath.start[1],
+                gameState.lightningStrikePath.start[2]
+            );
+            const endPos = new THREE.Vector3(
+                gameState.lightningStrikePath.end[0],
+                gameState.lightningStrikePath.end[1],
+                gameState.lightningStrikePath.end[2]
+            );
+            
+            // プレイヤーから雷の線分への最短距離を計算
+            const lineVector = endPos.clone().sub(startPos);
+            const playerVector = playerPos.clone().sub(startPos);
+            const lineLength = lineVector.length();
+            const projection = playerVector.dot(lineVector.normalize());
+            
+            // プレイヤーの投影点を線分上にクランプ
+            const clampedProjection = Math.max(0, Math.min(lineLength, projection));
+            const closestPoint = startPos.clone().add(lineVector.normalize().multiplyScalar(clampedProjection));
+            const distanceToLightning = playerPos.distanceTo(closestPoint);
+            
+            // 雷の当たり判定（半径2.0単位）
+            if (distanceToLightning < 2.0) {
+                console.log(`落ちてくる雷との衝突を検出！距離: ${distanceToLightning.toFixed(2)}`);
+                
+                // ダメージを与える
+                applyDamage(gameState, gameState.lightningStrikeDamage, gameOver);
+                
+                // 一度ダメージを受けたらフラグをリセット
+                gameState.lightningStrikeActive = false;
+            }
+        }
+        
+        // 地面放電との衝突判定
+        if (gameState.lightningDamageActive && gameState.lightningDamagePosition) {
+            // プレイヤーと雷の着弾地点の水平距離を計算
+            const horizontalDistance = Math.sqrt(
+                Math.pow(playerPos.x - gameState.lightningDamagePosition.x, 2) +
+                Math.pow(playerPos.z - gameState.lightningDamagePosition.z, 2)
+            );
+            
+            // ダメージ範囲内にいるかチェック
+            if (horizontalDistance < gameState.lightningDamageRadius) {
+                console.log(`地面放電との衝突を検出！距離: ${horizontalDistance.toFixed(2)}`);
+                
+                // ダメージを与える
+                applyDamage(gameState, gameState.lightningDamage || 10, gameOver);
+                
+                // 一度ダメージを受けたらフラグをリセット（連続ダメージを防ぐ）
+                gameState.lightningDamageActive = false;
+            }
+        }
+    }
+    
+    // 落ちてくる雷のタイマー更新
+    if (gameState.lightningStrikeTimer > 0) {
+        gameState.lightningStrikeTimer--;
+        if (gameState.lightningStrikeTimer <= 0) {
+            gameState.lightningStrikeActive = false;
+            gameState.lightningStrikePath = null;
+        }
+    }
+    
+    // 地面放電のタイマー更新
+    if (gameState.lightningDamageTimer > 0) {
+        gameState.lightningDamageTimer--;
+        if (gameState.lightningDamageTimer <= 0) {
+            gameState.lightningDamageActive = false;
+            gameState.lightningDamagePosition = null;
+        }
+    }
 } 

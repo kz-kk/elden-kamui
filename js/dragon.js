@@ -53,7 +53,7 @@ export function updateDragon(gameState) {
     gameState.dragonState.actionTimer++;
 
     // モード切り替えの判定
-    // console.log("ドラゴンモード:", gameState.dragonState.currentMode, "タイマー:", gameState.dragonState.actionTimer);
+    console.log("ドラゴンモード:", gameState.dragonState.currentMode, "タイマー:", gameState.dragonState.actionTimer);
     
     if (gameState.dragonState.currentMode === 'fly') {
         if (gameState.dragonState.actionTimer >= gameState.dragonState.flyDuration) {
@@ -62,7 +62,7 @@ export function updateDragon(gameState) {
 
             // 1回の飛行が完了したら待機モードへ（テスト用に短縮）
             if (gameState.dragonState.flyCount >= 1) {
-                console.log("ドラゴンが待機モードに移行します！");
+                // console.log("ドラゴンが待機モードに移行します！");
                 gameState.dragonState.currentMode = 'wait';
                 gameState.dragonState.flyCount = 0;
                 gameState.dragonState.waitCount = 0;
@@ -177,7 +177,7 @@ export function updateDragon(gameState) {
         const distanceToPlayer = dragonPosition.distanceTo(gameState.playerPosition);
         
         // デバッグ: 攻撃時のモード確認
-        console.log("ドラゴン攻撃実行 - モード:", gameState.dragonState.currentMode, "距離:", distanceToPlayer.toFixed(2));
+        // console.log("ドラゴン攻撃実行 - モード:", gameState.dragonState.currentMode, "距離:", distanceToPlayer.toFixed(2));
         
         // 距離が近いほど攻撃確率を上げる
         const distanceMultiplier = Math.max(0.5, Math.min(2.0, 30 / distanceToPlayer));
@@ -188,9 +188,9 @@ export function updateDragon(gameState) {
             (Date.now() - gameState.gameStartTime >= 5000) && 
             gameState.dragonFlameCooldown <= 0;
         
-        // より積極的に攻撃を行う（待機モード時は雷攻撃の確率を上げる）
-        const attackChance = isWaitMode ? adjustedFlameChance * 2 : adjustedFlameChance;
-        if (shouldAttackAfter5Seconds || Math.random() < attackChance || distanceToPlayer < 10) {
+        // 待機モード時の雷攻撃確率を調整（頻度を下げる）
+        const attackChance = isWaitMode ? adjustedFlameChance * 1.2 : adjustedFlameChance;
+        if (shouldAttackAfter5Seconds || Math.random() < attackChance || distanceToPlayer < 6) {
             // プレイヤーの現在位置を狙う
             const targetPosition = gameState.playerPosition.clone();
             
@@ -224,22 +224,28 @@ export function updateDragon(gameState) {
             
             // クールダウンをリセット（距離に応じて調整）
             const cooldownMultiplier = Math.max(0.5, Math.min(1.5, distanceToPlayer / 15));
-            // 待機モード時はクールダウンを短縮
+            // 待機モード時のクールダウン調整（短縮幅を抑制）
             const baseCooldown = gameState.dragonState.currentMode === 'wait' ? 
-                gameState.dragonFlameMaxCooldown * 0.7 : gameState.dragonFlameMaxCooldown;
+                gameState.dragonFlameMaxCooldown * 0.9 : gameState.dragonFlameMaxCooldown;
             gameState.dragonFlameCooldown = Math.floor(baseCooldown * cooldownMultiplier);
             
             // モードに応じて攻撃タイプを決定
             if (isWaitMode) {
                 // 待機モード時は雷攻撃
-                console.log("ドラゴンが雷攻撃を準備中！待機モード");
+                // console.log("ドラゴンが雷攻撃を準備中！待機モード");
                 gameState.shouldCreateDragonLightning = true;
-                // 雷の目標位置を設定
-                gameState.dragonLightningTarget = targetPosition.clone();
-                console.log("雷攻撃ターゲット設定:", targetPosition);
+                // 雷の目標位置を設定（プレイヤーをより正確に狙う）
+                const lightningTarget = targetPosition.clone();
+                // ランダムに0.5-1.5メートルの範囲で僅かにずらす（命中しやすく）
+                const offsetDistance = 0.5 + Math.random() * 1.0;
+                const offsetAngle = Math.random() * Math.PI * 2;
+                lightningTarget.x += Math.cos(offsetAngle) * offsetDistance;
+                lightningTarget.z += Math.sin(offsetAngle) * offsetDistance;
+                gameState.dragonLightningTarget = lightningTarget;
+                // console.log("雷攻撃ターゲット設定:", lightningTarget);
             } else {
                 // 飛行モード時は炎攻撃
-                console.log("ドラゴンが炎攻撃を準備中！飛行モード");
+                // console.log("ドラゴンが炎攻撃を準備中！飛行モード");
                 gameState.shouldCreateDragonFlame = true;
                 // 炎の目標がプレイヤーであることを明示
                 gameState.dragonFlameTargetPlayer = true;
@@ -277,7 +283,7 @@ export function updateDragon(gameState) {
                     gameState.sounds.dragonVoice.stop();
                 }
                 gameState.sounds.dragonVoice.play();
-                // console.log('ドラゴンボイス再生: dragon-voice1.mp3');
+                console.log('ドラゴンボイス再生: dragon-voice1.mp3');
             }
             
             // クールダウンをリセット
