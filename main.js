@@ -251,6 +251,15 @@ const gameState = {
     lightningStrikeDuration: 30, // 落ちてくる雷のダメージ持続時間
     lightningStrikeTimer: 0, // 落ちてくる雷のタイマー
     lightningStrikeDamage: 15, // 落ちてくる雷のダメージ量
+    
+    // 雷の予兆球体関連
+    lightningOrbActive: false, // 予兆球体が表示中かどうか
+    lightningOrbPosition: null, // 予兆球体の位置
+    lightningOrbTarget: null, // 雷の落下目標位置
+    lightningOrbTimer: 0, // 予兆球体の表示時間カウンター
+    lightningOrbDuration: 120, // 予兆球体の表示時間（2秒 = 120フレーム）
+    lightningOrbMesh: null, // 予兆球体のメッシュオブジェクト
+    
     isOnRock: false, // 岩の上にいるかどうか
     
     // 体力回復関連のパラメータ
@@ -261,6 +270,191 @@ const gameState = {
     // グローバルミュート状態
     isMuted: false, // ゲーム全体のミュート状態
 };
+
+// 電気粒子エフェクトを作成する関数
+function createLightningOrb(position, targetPos) {
+    // パーティクルシステムの作成
+    const particleCount = 1200; // 粒子数をさらに増やして細かい密度の高いエフェクトに
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    const velocities = new Float32Array(particleCount * 3);
+    
+    // ドラゴンの周りに粒子を配置
+    const dragonPos = gameState.dragonPosition;
+    for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        
+        // ドラゴンの翼の高さに球状分布
+        const radius = 2 + Math.random() * 3; // 2-5単位の範囲
+        const theta = Math.random() * Math.PI * 2; // 0-2π
+        const phi = Math.random() * Math.PI; // 0-π
+        
+        positions[i3] = dragonPos.x - 5 + radius * Math.sin(phi) * Math.cos(theta); // ドラゴンの左側（-5単位）
+        positions[i3 + 1] = dragonPos.y + 8 + radius * Math.cos(phi); // ドラゴンより8単位上（より高い位置）
+        positions[i3 + 2] = dragonPos.z + radius * Math.sin(phi) * Math.sin(theta);
+        
+        // 白い光の粒子
+        colors[i3] = 1.0; // R: 白
+        colors[i3 + 1] = 1.0; // G: 白
+        colors[i3 + 2] = 1.0; // B: 白
+        
+        // 小さな粒子サイズ
+        sizes[i] = 0.3 + Math.random() * 0.4; // 0.3-0.7の小さなサイズ
+        
+        // 螺旋状の動き
+        velocities[i3] = (Math.random() - 0.5) * 0.02;
+        velocities[i3 + 1] = (Math.random() - 0.5) * 0.01;
+        velocities[i3 + 2] = (Math.random() - 0.5) * 0.02;
+    }
+    
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    particles.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+    
+    // パーティクルのマテリアル
+    const particleMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 },
+            pointTexture: { value: null }
+        },
+        vertexShader: `
+            attribute float size;
+            attribute vec3 velocity;
+            uniform float time;
+            varying vec3 vColor;
+            
+            void main() {
+                vColor = color;
+                
+                // 時間による位置の変化（螺旋運動）
+                vec3 pos = position;
+                pos += velocity * time * 50.0;
+                
+                // ドラゴン周りの軌道運動
+                float angle = time * 2.0;
+                float radius = length(pos.xz);
+                pos.x += sin(angle + pos.y * 0.1) * 0.5;
+                pos.z += cos(angle + pos.y * 0.1) * 0.5;
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_PointSize = size * (150.0 / -mvPosition.z); // 小さな粒子用のサイズ係数
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            varying vec3 vColor;
+            
+            void main() {
+                // 円形の粒子
+                float distanceToCenter = length(gl_PointCoord - vec2(0.5));
+                if (distanceToCenter > 0.5) discard;
+                
+                // 電気的な輝き
+                float intensity = 1.0 - distanceToCenter * 2.0;
+                intensity = pow(intensity, 2.0);
+                
+                // 脈動効果
+                float pulse = 0.7 + 0.3 * sin(time * 8.0 + gl_PointCoord.x * 10.0);
+                
+                gl_FragColor = vec4(vColor * intensity * pulse * 2.0, intensity * 1.8);
+            }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true
+    });
+    
+    // パーティクルシステムを作成
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    
+    // シーンに追加
+    scene.add(particleSystem);
+    
+    // gameStateに保存
+    gameState.lightningOrbMesh = particleSystem;
+    
+    // アニメーション用の時間を保存
+    gameState.lightningOrbStartTime = Date.now();
+    
+    // パーティクルアニメーション
+    function updateParticles() {
+        if (particleMaterial.uniforms && gameState.lightningOrbActive) {
+            const elapsed = (Date.now() - gameState.lightningOrbStartTime) * 0.001;
+            particleMaterial.uniforms.time.value = elapsed;
+            requestAnimationFrame(updateParticles);
+        }
+    }
+    updateParticles();
+}
+
+// 予兆球体から雷を発射する関数
+function fireLightningFromOrb() {
+    if (!gameState.lightningOrbPosition || !gameState.lightningOrbTarget) return;
+    
+    // GLSLライトニングシステムで雷攻撃を実行
+    if (glslLightningSystem) {
+        // 粒子の凝縮点（ドラゴンの左側上空）から発射
+        const dragonPos = gameState.dragonPosition;
+        const startPos = [
+            dragonPos.x - 5, // ドラゴンの左側
+            dragonPos.y + 8, // 上空
+            dragonPos.z
+        ];
+        
+        // プレイヤーの現在位置をターゲットにする
+        const targetPos = [
+            gameState.playerPosition.x,
+            gameState.playerPosition.y,
+            gameState.playerPosition.z
+        ];
+        
+        glslLightningSystem.strikeTarget(startPos, targetPos, 60);
+        
+        // 落ちてくる雷のダメージ判定を設定
+        gameState.lightningStrikeActive = true;
+        gameState.lightningStrikePath = { start: startPos, end: targetPos };
+        gameState.lightningStrikeDuration = 30;
+        gameState.lightningStrikeTimer = gameState.lightningStrikeDuration;
+        gameState.lightningStrikeDamage = 15;
+        
+        // 雷の音を再生
+        if (!gameState.isMuted) {
+            if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
+                if (gameState.sounds.thunder.isPlaying) {
+                    gameState.sounds.thunder.stop();
+                }
+                gameState.sounds.thunder.setVolume(0.7);
+                gameState.sounds.thunder.play();
+            } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
+                if (gameState.sounds.fire.isPlaying) {
+                    gameState.sounds.fire.stop();
+                }
+                gameState.sounds.fire.setVolume(0.7);
+                gameState.sounds.fire.play();
+            } else {
+                console.warn("雷音が利用できません");
+            }
+        }
+    }
+    
+    // 予兆球体を削除
+    if (gameState.lightningOrbMesh) {
+        scene.remove(gameState.lightningOrbMesh);
+        gameState.lightningOrbMesh.geometry.dispose();
+        gameState.lightningOrbMesh.material.dispose();
+        gameState.lightningOrbMesh = null;
+    }
+    
+    // 予兆球体の状態をリセット
+    gameState.lightningOrbActive = false;
+    gameState.lightningOrbPosition = null;
+    gameState.lightningOrbTarget = null;
+    gameState.lightningOrbTimer = 0;
+}
 
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
@@ -1837,75 +2031,63 @@ function animate() {
             gameState.shouldCreateDragonFlame = false;
         }
         
-        // ドラゴンの雷エフェクト生成フラグが立っていれば雷エフェクトを生成
+        // ドラゴンの雷エフェクト生成フラグが立っていれば予兆球体を生成
         if (gameState.shouldCreateDragonLightning) {
-
-            // GLSLライトニングシステムで雷攻撃を実行
-            if (gameState.dragonPosition && gameState.dragonLightningTarget && glslLightningSystem) {
-                // 雷撃の座標計算（頭上から落下）
+            // 予兆球体を生成
+            if (gameState.dragonPosition && gameState.dragonLightningTarget && !gameState.lightningOrbActive) {
                 const playerPos = gameState.playerPosition;
                 const targetPos = [gameState.dragonLightningTarget.x, gameState.dragonLightningTarget.y, gameState.dragonLightningTarget.z];
                 
-                // プレイヤーの真上から開始（高度30-50の間、より低く）
-                const lightningHeight = 30 + Math.random() * 20;
-                const startPos = [
-                    playerPos.x + (Math.random() - 0.5) * 3, // 横のずれを3単位に縮小（より正確に）
-                    playerPos.y + lightningHeight, 
-                    playerPos.z + (Math.random() - 0.5) * 3
+                // ドラゴンの近くに予兆球体を配置
+                const dragonPos = gameState.dragonPosition;
+                const orbPos = [
+                    dragonPos.x + (Math.random() - 0.5) * 5, // ドラゴンの周囲5単位範囲
+                    dragonPos.y + (Math.random() - 0.5) * 3, // ドラゴンと同じ高度の周囲3単位範囲
+                    dragonPos.z + (Math.random() - 0.5) * 5
                 ];
                 
-                // console.log("=== 落雷攻撃座標詳細 ===");
-                // console.log("プレイヤー位置:", playerPos);
-                // console.log("落雷開始位置:", startPos);
-                // console.log("雷目標位置:", targetPos);
-                // console.log("落雷高度:", lightningHeight);
-                // console.log("========================");
+                // 予兆球体を作成
+                createLightningOrb(orbPos, targetPos);
                 
-                glslLightningSystem.strikeTarget(startPos, targetPos, 60);
-                
-                // 落ちてくる雷のダメージ判定を設定
-                gameState.lightningStrikeActive = true;
-                gameState.lightningStrikePath = { start: startPos, end: targetPos };
-                gameState.lightningStrikeDuration = 30; // 30フレーム（0.5秒）
-                gameState.lightningStrikeTimer = gameState.lightningStrikeDuration;
-                gameState.lightningStrikeDamage = 15; // 落ちてくる雷のダメージ
-                
-                // 地面放電のダメージ判定はglslLightningSystem.jsのaddExplosionで設定される
-                
-                // 雷の音を再生（thunder_sequence.mp3を使用）
-                // console.log("雷の音を再生するべき場所");
-                // ミュート状態でない場合のみ音声を再生
-                if (!gameState.isMuted) {
-                    if (gameState.sounds.thunder && gameState.sounds.thunder.buffer) {
-                        // console.log("雷音（thunder_sequence.mp3）を再生");
-                        if (gameState.sounds.thunder.isPlaying) {
-                            gameState.sounds.thunder.stop();
-                        }
-                        gameState.sounds.thunder.setVolume(0.7); // 音量を調整
-                        gameState.sounds.thunder.play();
-                        // console.log("雷音再生完了");
-                    } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
-                        // console.log("代替音として炎音を再生");
-                        if (gameState.sounds.fire.isPlaying) {
-                            gameState.sounds.fire.stop();
-                        }
-                        gameState.sounds.fire.setVolume(0.7);
-                        gameState.sounds.fire.play();
-                    } else {
-                        console.warn("雷音が利用できません");
-                    }
-                } else {
-    
-                }
-            } else {
-                console.error("雷攻撃に必要な要素が不足:", {
-                    dragonPosition: !!gameState.dragonPosition,
-                    lightningTarget: !!gameState.dragonLightningTarget,
-                    glslSystem: !!glslLightningSystem
-                });
+                // 予兆球体の状態を設定
+                gameState.lightningOrbActive = true;
+                gameState.lightningOrbPosition = orbPos;
+                gameState.lightningOrbTarget = targetPos;
+                gameState.lightningOrbTimer = gameState.lightningOrbDuration;
             }
             // フラグをリセット
             gameState.shouldCreateDragonLightning = false;
+        }
+        
+        // 電気粒子のタイマー処理
+        if (gameState.lightningOrbActive && gameState.lightningOrbTimer > 0) {
+            gameState.lightningOrbTimer--;
+            
+            // 粒子エフェクトの強度調整（時間が経つにつれて強くなる）
+            if (gameState.lightningOrbMesh && gameState.lightningOrbMesh.material) {
+                const timeProgress = 1.0 - (gameState.lightningOrbTimer / gameState.lightningOrbDuration);
+                const intensity = 0.5 + timeProgress * 1.5; // 0.5から2.0まで増加
+                
+                // 粒子の集中度を時間とともに高める
+                const positions = gameState.lightningOrbMesh.geometry.attributes.position.array;
+                const dragonPos = gameState.dragonPosition;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    // ドラゴンの左側上空に向かって徐々に収束
+                    const targetX = dragonPos.x - 5; // ドラゴンの左側
+                    const targetY = dragonPos.y + 8; // より高い位置
+                    positions[i] += (targetX - positions[i]) * 0.01 * timeProgress;
+                    positions[i + 1] += (targetY - positions[i + 1]) * 0.01 * timeProgress;
+                    positions[i + 2] += (dragonPos.z - positions[i + 2]) * 0.01 * timeProgress;
+                }
+                
+                gameState.lightningOrbMesh.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            // タイマーが終了したら雷を発射
+            if (gameState.lightningOrbTimer <= 0) {
+                fireLightningFromOrb();
+            }
         }
         
         // エフェクト数をデバッグ表示（100フレームに1回）
