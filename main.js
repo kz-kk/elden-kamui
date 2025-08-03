@@ -659,8 +659,8 @@ try {
 
 // 地面の作成
 const groundGeometry = new THREE.PlaneGeometry(100, 100);
-const groundTexture = new THREE.TextureLoader().load('./assets/area/dry_grassland.png');
-// const groundTexture = new THREE.TextureLoader().load('./assets/area/tsuchi.jpg');
+const groundTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/dry_grassland.png');
+// const groundTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/tsuchi.jpg');
 groundTexture.wrapS = THREE.RepeatWrapping;
 groundTexture.wrapT = THREE.RepeatWrapping;
 groundTexture.repeat.set(10, 10);
@@ -687,7 +687,7 @@ addRocks(scene, gameState);
 
 // スカイボックスの作成
 const skyGeometry = new THREE.SphereGeometry(500, 60, 40);
-const skyTexture = new THREE.TextureLoader().load('./assets/area/sunset.png');
+const skyTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/sunset.png');
 const skyMaterial = new THREE.MeshBasicMaterial({
     map: skyTexture,
     side: THREE.BackSide,
@@ -780,7 +780,7 @@ let isRollingAnimationPlaying = false; // ローリングアニメーション�
 if (loader) {
     try {
         updateLoadingProgress('Loading player model...');
-        loader.load('./assets/knight/wait.glb', (gltf) => {
+        loader.load('https://elden-kamui.netlify.app/assets/knight/wait.glb', (gltf) => {
             // console.log("プレイヤー待機モデル読み込み成功:", gltf);
             
             // 仮表示を削除
@@ -896,7 +896,7 @@ if (loader) {
                 
                 // 走るアニメーションを読み込む
                 updateLoadingProgress('Loading run animation...');
-                loader.load('./assets/knight/run.glb', (runGltf) => {
+                loader.load('https://elden-kamui.netlify.app/assets/knight/run.glb', (runGltf) => {
                     // console.log("プレイヤー走りモデル読み込み成功:", runGltf);
                     // console.log("走りモデルのアニメーション数:", runGltf.animations ? runGltf.animations.length : 0);
                     
@@ -985,7 +985,7 @@ if (loader) {
                 
                 // 攻撃アニメーションを読み込む
                 updateLoadingProgress('Loading attack animation...');
-                // loader.load('./assets/knight/attach.glb', (attachGltf) => {
+                // loader.load('https://elden-kamui.netlify.app/assets/knight/attach.glb', (attachGltf) => {
                 //     // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
                 //     if (attachGltf.animations && attachGltf.animations.length > 0) {
                 //         // 攻撃アニメーションを保存
@@ -1017,7 +1017,7 @@ if (loader) {
                 // });
                 
                 // ローリングアニメーションを読み込む
-                loader.load('./assets/knight/rolling.glb', (rollingGltf) => {
+                loader.load('https://elden-kamui.netlify.app/assets/knight/rolling.glb', (rollingGltf) => {
                     // console.log("プレイヤーローリングモデル読み込み成功:", rollingGltf);
                     if (rollingGltf.animations && rollingGltf.animations.length > 0) {
                         // ローリング専用のモデルとマテリアルを設定
@@ -1153,7 +1153,7 @@ if (loader) {
             }
 
             // ジャンプアニメーションを読み込む
-            // loader.load('./assets/knight/jump.glb', (jumpGltf) => {
+            // loader.load('https://elden-kamui.netlify.app/assets/knight/jump.glb', (jumpGltf) => {
             //     // console.log("プレイヤージャンプモデル読み込み成功:", jumpGltf);
             //     if (jumpGltf.animations && jumpGltf.animations.length > 0) {
             //         // ジャンプアニメーションを保存
@@ -1181,7 +1181,7 @@ if (loader) {
             // ドラゴンモデルの読み込み試行
             try {
                 updateLoadingProgress('Loading dragon model...');
-                loader.load('./assets/dragon/fly.glb', (gltf) => {
+                loader.load('https://elden-kamui.netlify.app/assets/dragon/fly.glb', (gltf) => {
                     // console.log("ドラゴンモデル読み込み成功:", gltf);
                     
                     // 仮表示を削除
@@ -1330,7 +1330,7 @@ function initializeAudio() {
         window.audioLoader = audioLoader;
         
         if (audioLoader) {
-            audioLoader.load('./assets/sound/music.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/music.mp3', (buffer) => {
                 bgmSound.setBuffer(buffer);
                 bgmSound.setLoop(true);
                 bgmSound.setVolume(gameState.isMuted ? 0 : 0.5);
@@ -1340,7 +1340,7 @@ function initializeAudio() {
 
             // 環境音
             windSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/wind.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/wind.mp3', (buffer) => {
                 windSound.setBuffer(buffer);
                 windSound.setLoop(true);
                 windSound.setVolume(gameState.isMuted ? 0 : 0.6);
@@ -1350,7 +1350,7 @@ function initializeAudio() {
 
             // 戦士の攻撃音
             const attackSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/attach.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/attach.mp3', (buffer) => {
                 attackSound.setBuffer(buffer);
                 attackSound.setLoop(false);
                 attackSound.setVolume(gameState.isMuted ? 0 : 0.7);
@@ -1362,7 +1362,7 @@ function initializeAudio() {
 
             // 戦士の足音
             const footstepSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/foot.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/foot.mp3', (buffer) => {
                 footstepSound.setBuffer(buffer);
                 footstepSound.setLoop(false);
                 footstepSound.setVolume(gameState.isMuted ? 0 : 0.5);
@@ -1374,7 +1374,7 @@ function initializeAudio() {
 
             // ドラゴンの炎音
             const fireSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/fire.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/fire.mp3', (buffer) => {
                 fireSound.setBuffer(buffer);
                 fireSound.setLoop(false);
                 fireSound.setVolume(gameState.isMuted ? 0 : 0.25);
@@ -1386,7 +1386,7 @@ function initializeAudio() {
 
             // パチパチ音（炎の効果音）
             const patipatiSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/patipati.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/patipati.mp3', (buffer) => {
                 patipatiSound.setBuffer(buffer);
                 patipatiSound.setLoop(false);
                 patipatiSound.setVolume(gameState.isMuted ? 0 : 0.6);
@@ -1398,7 +1398,7 @@ function initializeAudio() {
 
             // 回復音
             const healSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/heal.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/heal.mp3', (buffer) => {
                 healSound.setBuffer(buffer);
                 healSound.setLoop(false);
                 healSound.setVolume(gameState.isMuted ? 0 : 1.0);
@@ -1410,7 +1410,7 @@ function initializeAudio() {
 
             // ドラゴンボイス
             const dragonVoiceSound = new Audio(audioListener);
-            audioLoader.load('./assets/sound/dragon-voice2.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/dragon-voice2.mp3', (buffer) => {
                 dragonVoiceSound.setBuffer(buffer);
                 dragonVoiceSound.setLoop(false);
                 dragonVoiceSound.setVolume(gameState.isMuted ? 0 : 0.8);
@@ -1423,7 +1423,7 @@ function initializeAudio() {
             // ボタンクリック音
             const buttonClickSound = new Audio(audioListener);
     
-            audioLoader.load('./assets/sound/btn.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/btn.mp3', (buffer) => {
                 buttonClickSound.setBuffer(buffer);
                 buttonClickSound.setLoop(false);
                 buttonClickSound.setVolume(gameState.isMuted ? 0 : 0.3);
@@ -1436,7 +1436,7 @@ function initializeAudio() {
             // 雷音
             const thunderSound = new Audio(audioListener);
 
-            audioLoader.load('./assets/sound/thunder_sequence.mp3', (buffer) => {
+            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/thunder_sequence.mp3', (buffer) => {
                 thunderSound.setBuffer(buffer);
                 thunderSound.setLoop(false);
                 thunderSound.setVolume(gameState.isMuted ? 0 : 0.7);
