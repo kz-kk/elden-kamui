@@ -3,12 +3,28 @@
 // 依存関係のインポート
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ========================================
+// アセットパス設定（main.jsと同期）
+// ========================================
+// 注意：この設定はmain.jsと同期させる必要があります
+const USE_LOCAL_ASSETS = true; // true: ローカルアセットを使用, false: 外部URLを使用
+const EXTERNAL_BASE_URL = 'https://elden-kamui.netlify.app';
+const LOCAL_BASE_PATH = '..';
+
+export function getAssetPath(relativePath) {
+    if (USE_LOCAL_ASSETS) {
+        return `${LOCAL_BASE_PATH}/${relativePath}`;
+    } else {
+        return `${EXTERNAL_BASE_URL}/${relativePath}`;
+    }
+}
 import { PMREMGenerator } from 'three';
 
 // 草を生やす関数
 export function addGrass(scene, gameState) {
     // 草の数と配置範囲（メモリ最適化のため大幅に削減）
-    const grassCount = 150; // 草の数を大幅削減（パフォーマンス最適化）
+    const grassCount = 600; // 草の数を大幅に増やす（サイズを小さくして軽量化）
     const areaSize = 30;
     
     // 草の色のバリエーション（画像に色を乗算）
@@ -25,7 +41,7 @@ export function addGrass(scene, gameState) {
     const textureLoader = new THREE.TextureLoader();
     
     // 明示的に指定されたパス
-    const grassTexturePath = 'https://elden-kamui.netlify.app/assets/area/grass.png';
+    const grassTexturePath = getAssetPath('assets/area/grass.png');
     let grassTexture = null;
     
     // console.log(`草のテクスチャ読み込み開始: ${grassTexturePath}`);
@@ -158,7 +174,7 @@ export function addGrass(scene, gameState) {
                 // 草のインスタンスを作成
                 for (let i = 0; i < currentBatchSize; i++) {
                     // ランダムなサイズを決定
-                    const size = Math.random() * 2.5 + 1.0; // サイズを大きく（1.0～3.5）
+                    const size = Math.random() * 1.0 + 0.5; // サイズを小さく（0.5～1.5）
                     
                     // クラスタリングを考慮したランダムな位置
                     let x, z;
@@ -208,7 +224,7 @@ export function addGrass(scene, gameState) {
                         grassMesh.position.set(x, -4.9, z);
                         
                         // サイズを設定
-                        grassMesh.scale.set(size * 0.8, size * (0.8 + Math.random() * 0.4), 1);
+                        grassMesh.scale.set(size * 0.6, size * (0.8 + Math.random() * 0.3), 1);
                         
                         // 回転を設定（Y軸周りのランダム回転）
                         grassMesh.rotation.y = Math.random() * Math.PI * 2;
@@ -292,7 +308,7 @@ export function addGrass(scene, gameState) {
                 // 草のインスタンスを作成
                 for (let i = 0; i < currentBatchSize; i++) {
                     // ランダムなサイズを決定
-                    const size = Math.random() * 2.5 + 1.0; // サイズを大きく（1.0～3.5）
+                    const size = Math.random() * 1.0 + 0.5; // サイズを小さく（0.5～1.5）
                     
                     // クラスタリングを考慮したランダムな位置
                     let x, z;
@@ -380,7 +396,7 @@ export function addRocks(scene, gameState) {
     
     // 岩のモデルを読み込む
     loader.load(
-        'https://elden-kamui.netlify.app/assets/area/weathered_rock.glb', // 岩のモデルパス
+        getAssetPath('assets/area/weathered_rock.glb'), // 岩のモデルパス
         function(gltf) {
             // console.log("岩のモデル読み込み成功");
             
@@ -542,7 +558,7 @@ export function addRocks(scene, gameState) {
             // モデルのパスが間違っている可能性があるため別のパスも試す
             // console.log("別のパスで岩のモデルの読み込みを試みます...");
             loader.load(
-                'https://elden-kamui.netlify.app/assets/rocks/weathered_rock.glb', // 代替パス
+                getAssetPath('assets/rocks/weathered_rock.glb'), // 代替パス
                 function(gltf) {
                     // console.log("代替パスから岩のモデル読み込み成功");
                     // 読み込んだモデルをテンプレートとして使用
@@ -701,10 +717,10 @@ export function addRocks(scene, gameState) {
 
 // 草の揺れを更新する関数
 export function updateGrassWind(gameState) {
-    // パフォーマンス向上のため、10フレームに1回だけ更新（さらに軽量化）
+    // パフォーマンス向上のため、15フレームに1回だけ更新（さらに軽量化）
     if (!gameState.grassUpdateCounter) gameState.grassUpdateCounter = 0;
     gameState.grassUpdateCounter++;
-    if (gameState.grassUpdateCounter % 10 !== 0) return;
+    if (gameState.grassUpdateCounter % 15 !== 0) return;
     
     // 現在の時間を取得（風のアニメーションに使用）
     const time = performance.now() * 0.001;

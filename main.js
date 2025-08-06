@@ -6,10 +6,148 @@ import { AudioListener, Audio, AudioLoader } from 'three';
 import { PMREMGenerator, CubeTextureLoader } from 'three';
 
 // 環境関連のインポート
-import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap } from './js/environment.js';
+import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap, getAssetPath } from './js/environment.js';
 
 // アニメーション関連のインポート
 import { analyzeAnimation } from './js/animation.js';
+
+// ========================================
+// アセット管理システム
+// ========================================
+const ASSETS = {
+    // 3Dモデル
+    models: {
+        'player_wait': 'assets/knight/wait.glb',
+        'player_run': 'assets/knight/run.glb', 
+        'player_rolling': 'assets/knight/rolling.glb',
+        'dragon_fly': 'assets/dragon/fly.glb'
+    },
+    // 音声ファイル
+    sounds: {
+        'bgm': 'assets/sound/music.mp3',
+        'wind': 'assets/sound/wind.mp3',
+        'attack': 'assets/sound/attach.mp3',
+        'footstep': 'assets/sound/foot.mp3',
+        'fire': 'assets/sound/fire.mp3',
+        'patipati': 'assets/sound/patipati.mp3',
+        'heal': 'assets/sound/heal.mp3',
+        'dragon_voice': 'assets/sound/dragon-voice2.mp3',
+        'button': 'assets/sound/btn.mp3',
+        'thunder': 'assets/sound/thunder_sequence.mp3'
+    },
+    // テクスチャ
+    textures: {
+        'ground': 'assets/area/dry_grassland.png',
+        'sky': 'assets/area/sunset.png'
+    }
+};
+
+// プログレス管理用のアセットローダー
+class AssetLoader {
+    constructor() {
+        this.totalAssets = 0;
+        this.loadedAssets = 0;
+        this.gltfLoader = new GLTFLoader();
+        this.audioLoader = new AudioLoader();
+        this.textureLoader = new THREE.TextureLoader();
+        
+        // アセット数をカウント
+        this.totalAssets = Object.keys(ASSETS.models).length + Object.keys(ASSETS.sounds).length;
+        gameState.totalAssets = this.totalAssets;
+        
+        console.log(`Total assets to load: ${this.totalAssets}`);
+    }
+    
+    loadModel(key, onSuccess, onError) {
+        const path = getAssetPath(ASSETS.models[key]);
+        console.log(`Loading model: ${key} from ${path}`);
+        
+        this.gltfLoader.load(
+            path,
+            (gltf) => {
+                this.onAssetLoaded(`Model: ${key}`);
+                if (onSuccess) onSuccess(gltf);
+            },
+            null,
+            (error) => {
+                console.error(`Failed to load model ${key}:`, error);
+                this.onAssetLoaded(`Model: ${key} (failed)`);
+                if (onError) onError(error);
+            }
+        );
+    }
+    
+    loadSound(key, onSuccess, onError) {
+        const path = getAssetPath(ASSETS.sounds[key]);
+        console.log(`Loading sound: ${key} from ${path}`);
+        
+        this.audioLoader.load(
+            path,
+            (buffer) => {
+                this.onAssetLoaded(`Sound: ${key}`);
+                if (onSuccess) onSuccess(buffer);
+            },
+            null,
+            (error) => {
+                console.error(`Failed to load sound ${key}:`, error);
+                this.onAssetLoaded(`Sound: ${key} (failed)`);
+                if (onError) onError(error);
+            }
+        );
+    }
+    
+    loadTexture(key, onSuccess, onError) {
+        const path = getAssetPath(ASSETS.textures[key]);
+        console.log(`Loading texture: ${key} from ${path}`);
+        
+        this.textureLoader.load(
+            path,
+            (texture) => {
+                this.onAssetLoaded(`Texture: ${key}`);
+                if (onSuccess) onSuccess(texture);
+            },
+            null,
+            (error) => {
+                console.error(`Failed to load texture ${key}:`, error);
+                this.onAssetLoaded(`Texture: ${key} (failed)`);
+                if (onError) onError(error);
+            }
+        );
+    }
+    
+    onAssetLoaded(assetName) {
+        this.loadedAssets++;
+        const progress = Math.min((this.loadedAssets / this.totalAssets) * 100, 100);
+        
+        console.log(`Asset loaded: ${assetName} (${this.loadedAssets}/${this.totalAssets} = ${Math.floor(progress)}%)`);
+        
+        // プログレスバー更新
+        gameState.loadedAssets = this.loadedAssets;
+        gameState.loadingProgress = progress;
+        
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        
+        if (progressBar) {
+            progressBar.style.width = progress + '%';
+        }
+        
+        if (progressText) {
+            progressText.textContent = Math.floor(progress) + '%';
+        }
+        
+        // すべてのアセットが読み込まれたら完了処理
+        if (this.loadedAssets >= this.totalAssets && gameState.isLoading) {
+            console.log('All assets loaded! Finalizing...');
+            gameState.isLoading = false;
+            document.getElementById('loading').style.display = 'none';
+            onLoadingComplete();
+        }
+    }
+}
+
+// グローバルなアセットローダーインスタンス（後で初期化）
+let assetLoader;
 
 // UI関連のインポート
 import { updateHealthBar, updateDragonHealthBar, gameOver, restartGame, setupRestartButton, showWinScreen, setupWinButton } from './js/ui.js';
@@ -53,7 +191,7 @@ const gameState = {
     gameStarted: false,
     videoPlaying: false,
     loadingProgress: 0,
-    totalAssets: 0,
+    totalAssets: 0, // アセットローダーで動的に設定
     loadedAssets: 0,
     keysPressed: {},
     playerPosition: new THREE.Vector3(0, -5.0, 0), // プレイヤーの位置を地面に合わせて調整（地面は-5.0）
@@ -158,7 +296,7 @@ const gameState = {
     // 足元の煙エフェクト関連のパラメータ
     dustEffects: [], // 煙エフェクトを管理する配列
     dustLifetime: 25, // 煙エフェクトの寿命（フレーム単位）
-    dustSize: 0.15, // 煙の粒子の大きさ（小さくする）
+    dustSize: 0.08, // 煙の粒子の大きさ（小さくする）
     dustParticleCount: 15, // 1回の煙エフェクトの粒子数
     dustSpawnInterval: 5, // 煙エフェクト生成の間隔（フレーム単位）
     dustSpawnTimer: 0, // 煙エフェクト生成のタイマー
@@ -270,6 +408,9 @@ const gameState = {
     // グローバルミュート状態
     isMuted: false, // ゲーム全体のミュート状態
 };
+
+// AssetLoaderを初期化
+assetLoader = new AssetLoader();
 
 // 電気粒子エフェクトを作成する関数
 function createLightningOrb(position, targetPos) {
@@ -777,10 +918,9 @@ let currentAnimation = null; // 現在再生中のアニメーション
 let isRollingAnimationPlaying = false; // ローリングアニメーション再生中かどうか
 
 // プレイヤーモデルの読み込み試行
-if (loader) {
+if (assetLoader) {
     try {
-        updateLoadingProgress('Loading player model...');
-        loader.load('https://elden-kamui.netlify.app/assets/knight/wait.glb', (gltf) => {
+        assetLoader.loadModel('player_wait', (gltf) => {
             // console.log("プレイヤー待機モデル読み込み成功:", gltf);
             
             // 仮表示を削除
@@ -896,7 +1036,7 @@ if (loader) {
                 
                 // 走るアニメーションを読み込む
                 updateLoadingProgress('Loading run animation...');
-                loader.load('https://elden-kamui.netlify.app/assets/knight/run.glb', (runGltf) => {
+                assetLoader.loadModel('player_run', (runGltf) => {
                     // console.log("プレイヤー走りモデル読み込み成功:", runGltf);
                     // console.log("走りモデルのアニメーション数:", runGltf.animations ? runGltf.animations.length : 0);
                     
@@ -983,8 +1123,8 @@ if (loader) {
                     console.error('プレイヤー走りモデル読み込みエラー:', error);
                 });
                 
-                // 攻撃アニメーションを読み込む
-                updateLoadingProgress('Loading attack animation...');
+                // 攻撃アニメーションを読み込む（現在は無効化）
+                // updateLoadingProgress('Loading attack animation...');
                 // loader.load('https://elden-kamui.netlify.app/assets/knight/attach.glb', (attachGltf) => {
                 //     // console.log("プレイヤー攻撃モデル読み込み成功:", attachGltf);
                 //     if (attachGltf.animations && attachGltf.animations.length > 0) {
@@ -1017,7 +1157,8 @@ if (loader) {
                 // });
                 
                 // ローリングアニメーションを読み込む
-                loader.load('https://elden-kamui.netlify.app/assets/knight/rolling.glb', (rollingGltf) => {
+                updateLoadingProgress('Loading rolling animation...');
+                assetLoader.loadModel('player_rolling', (rollingGltf) => {
                     // console.log("プレイヤーローリングモデル読み込み成功:", rollingGltf);
                     if (rollingGltf.animations && rollingGltf.animations.length > 0) {
                         // ローリング専用のモデルとマテリアルを設定
@@ -1181,8 +1322,9 @@ if (loader) {
             // ドラゴンモデルの読み込み試行
             try {
                 updateLoadingProgress('Loading dragon model...');
-                loader.load('https://elden-kamui.netlify.app/assets/dragon/fly.glb', (gltf) => {
-                    // console.log("ドラゴンモデル読み込み成功:", gltf);
+                console.log('Starting dragon model load...');
+                assetLoader.loadModel('dragon_fly', (gltf) => {
+                    console.log("ドラゴンモデル読み込み成功:", gltf);
                     
                     // 仮表示を削除
                     scene.remove(dragonPlaceholder);
@@ -1258,24 +1400,20 @@ if (loader) {
                         const dragonAction = dragonMixer.clipAction(gltf.animations[0]);
                         dragonAction.play();
                     }
+                    
+                    // ドラゴンモデル読み込み完了（ただし、他のアセットの読み込みを待つ必要がある）
+                    console.log('Dragon model loaded, checking if all assets are loaded...');
                 }, 
                 (xhr) => {
                     // console.log((xhr.loaded / xhr.total * 100) + '% ドラゴンモデル読み込み中...');
                 },
                 (error) => {
                     console.error('ドラゴンモデル読み込みエラー:', error);
+                    console.error('Error details:', error.message, error.stack);
                 });
             } catch (e) {
                 console.error("ドラゴンモデル読み込み例外:", e);
             }
-            
-            // ロード完了時の処理
-            updateLoadingProgress('Finalizing...');
-            gameState.isLoading = false;
-            document.getElementById('loading').style.display = 'none';
-            
-            // ローディング完了処理
-            onLoadingComplete();
         }, 
         (xhr) => {
             // console.log((xhr.loaded / xhr.total * 100) + '% プレイヤーモデル読み込み中...');
@@ -1330,125 +1468,96 @@ function initializeAudio() {
         window.audioLoader = audioLoader;
         
         if (audioLoader) {
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/music.mp3', (buffer) => {
+            assetLoader.loadSound('bgm', (buffer) => {
                 bgmSound.setBuffer(buffer);
                 bgmSound.setLoop(true);
                 bgmSound.setVolume(gameState.isMuted ? 0 : 0.5);
-            }, null, (error) => {
-                console.error('BGM読み込みエラー:', error);
             });
 
             // 環境音
             windSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/wind.mp3', (buffer) => {
+            assetLoader.loadSound('wind', (buffer) => {
                 windSound.setBuffer(buffer);
                 windSound.setLoop(true);
                 windSound.setVolume(gameState.isMuted ? 0 : 0.6);
-            }, null, (error) => {
-                console.error('環境音読み込みエラー:', error);
             });
 
             // 戦士の攻撃音
             const attackSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/attach.mp3', (buffer) => {
+            assetLoader.loadSound('attack', (buffer) => {
                 attackSound.setBuffer(buffer);
                 attackSound.setLoop(false);
                 attackSound.setVolume(gameState.isMuted ? 0 : 0.7);
                 gameState.sounds.attack = attackSound;
-                // console.log('攻撃音読み込み成功');
-            }, null, (error) => {
-                console.error('攻撃音読み込みエラー:', error);
             });
 
             // 戦士の足音
             const footstepSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/foot.mp3', (buffer) => {
+            assetLoader.loadSound('footstep', (buffer) => {
                 footstepSound.setBuffer(buffer);
                 footstepSound.setLoop(false);
                 footstepSound.setVolume(gameState.isMuted ? 0 : 0.5);
                 gameState.sounds.footstep = footstepSound;
                 // console.log('足音読み込み成功');
-            }, null, (error) => {
-                console.error('足音読み込みエラー:', error);
             });
 
             // ドラゴンの炎音
             const fireSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/fire.mp3', (buffer) => {
+            assetLoader.loadSound('fire', (buffer) => {
                 fireSound.setBuffer(buffer);
                 fireSound.setLoop(false);
                 fireSound.setVolume(gameState.isMuted ? 0 : 0.25);
                 gameState.sounds.fire = fireSound;
                 // console.log('炎音読み込み成功');
-            }, null, (error) => {
-                console.error('炎音読み込みエラー:', error);
             });
 
             // パチパチ音（炎の効果音）
             const patipatiSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/patipati.mp3', (buffer) => {
+            assetLoader.loadSound('patipati', (buffer) => {
                 patipatiSound.setBuffer(buffer);
                 patipatiSound.setLoop(false);
                 patipatiSound.setVolume(gameState.isMuted ? 0 : 0.6);
                 gameState.sounds.patipati = patipatiSound;
                 // console.log('パチパチ音読み込み成功');
-            }, null, (error) => {
-                console.error('パチパチ音読み込みエラー:', error);
             });
 
             // 回復音
             const healSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/heal.mp3', (buffer) => {
+            assetLoader.loadSound('heal', (buffer) => {
                 healSound.setBuffer(buffer);
                 healSound.setLoop(false);
                 healSound.setVolume(gameState.isMuted ? 0 : 1.0);
                 gameState.sounds.heal = healSound;
                 // console.log('回復音読み込み成功');
-            }, null, (error) => {
-                console.error('回復音読み込みエラー:', error);
             });
 
             // ドラゴンボイス
             const dragonVoiceSound = new Audio(audioListener);
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/dragon-voice2.mp3', (buffer) => {
+            assetLoader.loadSound('dragon_voice', (buffer) => {
                 dragonVoiceSound.setBuffer(buffer);
                 dragonVoiceSound.setLoop(false);
-                dragonVoiceSound.setVolume(gameState.isMuted ? 0 : 0.8);
+                dragonVoiceSound.setVolume(gameState.isMuted ? 0 : 0.3);
                 gameState.sounds.dragonVoice = dragonVoiceSound;
-        
-            }, null, (error) => {
-                console.error('ドラゴンボイス読み込みエラー:', error);
             });
 
             // ボタンクリック音
             const buttonClickSound = new Audio(audioListener);
     
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/btn.mp3', (buffer) => {
+            assetLoader.loadSound('button', (buffer) => {
                 buttonClickSound.setBuffer(buffer);
                 buttonClickSound.setLoop(false);
                 buttonClickSound.setVolume(gameState.isMuted ? 0 : 0.3);
                 gameState.sounds.buttonClick = buttonClickSound;
-
-            }, null, (error) => {
-                console.error('btn.mp3読み込みエラー:', error);
             });
 
             // 雷音
             const thunderSound = new Audio(audioListener);
 
-            audioLoader.load('https://elden-kamui.netlify.app/assets/sound/thunder_sequence.mp3', (buffer) => {
+            assetLoader.loadSound('thunder', (buffer) => {
                 thunderSound.setBuffer(buffer);
                 thunderSound.setLoop(false);
                 thunderSound.setVolume(gameState.isMuted ? 0 : 0.7);
                 gameState.sounds.thunder = thunderSound;
-
-            }, null, (error) => {
-                console.error('雷音読み込みエラー:', error);
-                // 代替音として他の音を使用
-                if (gameState.sounds.attack) {
-
-                    gameState.sounds.thunder = gameState.sounds.attack;
-                }
             });
 
             // キー入力の処理
@@ -1688,6 +1797,8 @@ function initializeAudio() {
     }
 }
 
+// 音声初期化を実行
+initializeAudio();
 
 window.addEventListener('keyup', (e) => {
     gameState.keysPressed[e.key] = false;
@@ -2451,21 +2562,22 @@ function showGameScreen() {
     // console.log('ゲーム画面を表示しました');
 }
 
-// ローディング進行状況を更新する関数
+// ローディング進行状況を更新する関数（旧システム - 無効化）
 function updateLoadingProgress(message) {
-    const loadingText = document.getElementById('loadingText');
-    if (loadingText) {
-        loadingText.textContent = message;
-    }
+    // 新しいAssetLoaderシステムを使用するため、この関数は何もしない
+    console.log(`Legacy loading message: ${message}`);
+}
+
+// プログレスバーを更新する関数（旧システム - 無効化）
+function updateProgressBar() {
+    // 新しいAssetLoaderシステムを使用するため、この関数は何もしない
 }
 
 // ローディング完了時にスタートボタンを表示する関数
 function onLoadingComplete() {
     // console.log('ローディング完了');
     
-    // 音声を早期に初期化（STARTボタンクリック時に音声が使用可能になるように）
-    // console.log('音声の早期初期化を開始');
-    initializeAudio();
+    // 音声はすでに初期化済み
     
     // STARTボタンを表示・有効化
     const startButton = document.getElementById('startButton');
@@ -2496,6 +2608,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初期状態でローディング中を表示
     if (loadingText) {
         loadingText.textContent = 'Loading assets...';
+    }
+    
+    // プログレスバーの初期化
+    gameState.loadedAssets = 0;
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    if (progressBar) {
+        progressBar.style.width = '0%';
+    }
+    if (progressText) {
+        progressText.textContent = '0%';
     }
     
     if (startButton && startScreen && introVideo) {
