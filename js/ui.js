@@ -85,6 +85,12 @@ export function gameOver(gameState) {
     const gameOverScreen = document.getElementById('gameOverScreen');
     gameOverScreen.style.display = 'flex';
     
+    // モバイルジョイスティックを非表示
+    const mobileJoystick = document.getElementById('mobileJoystick');
+    if (mobileJoystick) {
+        mobileJoystick.style.display = 'none';
+    }
+    
     // console.log("ゲームオーバー！");
 }
 
@@ -160,6 +166,14 @@ export function restartGame(gameState, scene) {
     // 体力インジケーターを更新
     updateHealthBar(gameState);
     
+    // モバイルデバイスの場合、ジョイスティックを再表示
+    if (window.innerWidth <= 968) {
+        const mobileJoystick = document.getElementById('mobileJoystick');
+        if (mobileJoystick) {
+            mobileJoystick.style.display = 'block';
+        }
+    }
+    
     // console.log("ゲームをリスタートしました");
 }
 
@@ -198,6 +212,12 @@ export function showWinScreen(gameState) {
     const dragonContainer = document.getElementById('dragonHealthContainer');
     if (dragonContainer) {
         dragonContainer.style.display = 'none';
+    }
+    
+    // モバイルジョイスティックを非表示
+    const mobileJoystick = document.getElementById('mobileJoystick');
+    if (mobileJoystick) {
+        mobileJoystick.style.display = 'none';
     }
     
     console.log("You Win!");

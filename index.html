@@ -150,7 +150,7 @@
         }
         #dragonHealthContainer {
             position: absolute;
-            bottom: 50px;
+            bottom: 30px;
             left: 25%;
             width: 50%;
             height: 10px;
@@ -158,6 +158,7 @@
             /* border: 2px solid #333; */
             border-radius: 3px;
             overflow: hidden;
+            z-index: 100;
         }
         #dragonHealthBar {
             width: 100%;
@@ -167,7 +168,7 @@
         }
         #dragonTitle {
             position: absolute;
-            bottom: 65px; /* インジケーターの上に配置 */
+            bottom: 45px; /* インジケーターの上に配置 */
             left: 25%; /* インジケーターと同じ左端位置 */
             color: white;
             font-family: "Times New Roman", Times, serif;
@@ -176,6 +177,7 @@
             /* text-shadow: 2px 2px 4px black; */
             pointer-events: none;
             margin-bottom: 5px;
+            z-index: 100;
         }
         #gameOverScreen {
             position: absolute;
@@ -506,6 +508,75 @@
             text-decoration: line-through;
         }
         
+        /* モバイル用ジョイスティックコントロール */
+        #mobileJoystick {
+            position: fixed;
+            bottom: 100px; /* ドラゴンインジケーターより上に配置 */
+            left: 20px;
+            display: none;
+            z-index: 2000; /* ドラゴンインジケーターより上に表示 */
+        }
+        
+        #joystickBase {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6));
+            border: 2px solid rgba(212, 175, 55, 0.6);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 15px rgba(0, 0, 0, 0.5),
+                inset 0 0 15px rgba(212, 175, 55, 0.2);
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        #joystickBase::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 90%;
+            height: 1px;
+            background: rgba(212, 175, 55, 0.2);
+            transform: translate(-50%, -50%);
+        }
+        
+        #joystickBase::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1px;
+            height: 90%;
+            background: rgba(212, 175, 55, 0.2);
+            transform: translate(-50%, -50%);
+        }
+        
+        #joystickKnob {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, #f4d03f, #d4af37);
+            border: 2px solid #b8860b;
+            border-radius: 50%;
+            box-shadow: 
+                0 2px 8px rgba(0, 0, 0, 0.5),
+                inset -1px -1px 3px rgba(0, 0, 0, 0.3);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: none;
+            pointer-events: none;
+        }
+        
+        #joystickKnob.active {
+            box-shadow: 
+                0 1px 5px rgba(0, 0, 0, 0.5),
+                inset -1px -1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
         /* モバイル対応 - 968px以下でsplash_spに切り替え */
         @media screen and (max-width: 968px) {
             #startScreen {
@@ -513,7 +584,11 @@
             }
             
             #bottomControls {
-                bottom: 60px;
+                bottom: 20px;
+            }
+            
+            #mobileJoystick {
+                display: none; /* ゲーム開始まで非表示 */
             }
         }
     </style>
@@ -607,6 +682,13 @@
     
     <!-- カメラボタン -->
     <button id="cameraButton" title="シネマティックカメラ">📷</button>
+    
+    <!-- モバイル用ジョイスティックコントロール -->
+    <div id="mobileJoystick">
+        <div id="joystickBase">
+            <div id="joystickKnob"></div>
+        </div>
+    </div>
     
     <!-- テスト用スクリプト -->
     <script>

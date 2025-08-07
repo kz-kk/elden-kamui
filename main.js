@@ -407,6 +407,12 @@ const gameState = {
     
     // グローバルミュート状態
     isMuted: false, // ゲーム全体のミュート状態
+    
+    // ドラッグ操作関連
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragThreshold: 10, // ドラッグと判定する最小移動距離
 };
 
 // AssetLoaderを初期化
@@ -1324,7 +1330,8 @@ if (assetLoader) {
                 updateLoadingProgress('Loading dragon model...');
                 console.log('Starting dragon model load...');
                 assetLoader.loadModel('dragon_fly', (gltf) => {
-                    console.log("ドラゴンモデル読み込み成功:", gltf);
+
+                    // console.log("ドラゴンモデル読み込み成功:", gltf);
                     
                     // 仮表示を削除
                     scene.remove(dragonPlaceholder);
@@ -1800,8 +1807,179 @@ function initializeAudio() {
 // 音声初期化を実行
 initializeAudio();
 
+// モバイル用矢印キーコントロールの初期化を別関数に移動
+function initializeMobileControls() {
+    const mobileUp = document.getElementById('mobileUp');
+    const mobileLeft = document.getElementById('mobileLeft');
+    const mobileRight = document.getElementById('mobileRight');
+    
+    // console.log('モバイルコントロール初期化:', { mobileUp, mobileLeft, mobileRight });
+
+    // マウスイベント（PCでもスマホでも動作）
+    if (mobileUp) {
+        mobileUp.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowUp'] = true;
+        });
+        mobileUp.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowUp'] = false;
+        });
+        mobileUp.addEventListener('mouseleave', (e) => {
+            gameState.keysPressed['ArrowUp'] = false;
+        });
+        // タッチイベントも追加
+        mobileUp.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowUp'] = true;
+        });
+        mobileUp.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowUp'] = false;
+        });
+    }
+
+    if (mobileLeft) {
+        mobileLeft.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowLeft'] = true;
+        });
+        mobileLeft.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowLeft'] = false;
+        });
+        mobileLeft.addEventListener('mouseleave', (e) => {
+            gameState.keysPressed['ArrowLeft'] = false;
+        });
+        // タッチイベントも追加
+        mobileLeft.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowLeft'] = true;
+        });
+        mobileLeft.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowLeft'] = false;
+        });
+    }
+
+    if (mobileRight) {
+        mobileRight.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowRight'] = true;
+        });
+        mobileRight.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowRight'] = false;
+        });
+        mobileRight.addEventListener('mouseleave', (e) => {
+            gameState.keysPressed['ArrowRight'] = false;
+        });
+        // タッチイベントも追加
+        mobileRight.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowRight'] = true;
+        });
+        mobileRight.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['ArrowRight'] = false;
+        });
+    }
+}
+
 window.addEventListener('keyup', (e) => {
     gameState.keysPressed[e.key] = false;
+});
+
+// マウスドラッグイベントの処理
+window.addEventListener('mousedown', (e) => {
+    if (!gameState.gameStarted || gameState.isGameOver) return;
+    
+    // モバイルボタン上でのクリックは無視
+    if (e.target.classList.contains('mobile-control') || 
+        e.target.closest('.mobile-control')) return;
+    
+    gameState.isDragging = true;
+    gameState.dragStartX = e.clientX;
+    gameState.dragStartY = e.clientY;
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!gameState.isDragging || !gameState.gameStarted || gameState.isGameOver) return;
+    
+    const deltaX = e.clientX - gameState.dragStartX;
+    const deltaY = e.clientY - gameState.dragStartY;
+    
+    // ドラッグの移動量が閾値を超えた場合のみ処理
+    if (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold) {
+        // 移動方向を判定
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // 横方向の移動が大きい
+            gameState.keysPressed['ArrowLeft'] = deltaX < 0;
+            gameState.keysPressed['ArrowRight'] = deltaX > 0;
+        } else {
+            // 縦方向の移動が大きい
+            gameState.keysPressed['ArrowUp'] = deltaY < 0;
+            gameState.keysPressed['ArrowDown'] = deltaY > 0;
+        }
+    }
+});
+
+window.addEventListener('mouseup', () => {
+    if (gameState.isDragging) {
+        gameState.isDragging = false;
+        // ドラッグ終了時に全ての方向キーをリセット
+        gameState.keysPressed['ArrowUp'] = false;
+        gameState.keysPressed['ArrowDown'] = false;
+        gameState.keysPressed['ArrowLeft'] = false;
+        gameState.keysPressed['ArrowRight'] = false;
+    }
+});
+
+// タッチイベントの処理（モバイル対応）
+window.addEventListener('touchstart', (e) => {
+    if (!gameState.gameStarted || gameState.isGameOver) return;
+    
+    // モバイルボタン上でのタッチは無視
+    if (e.target.classList.contains('mobile-control') || 
+        e.target.closest('.mobile-control')) return;
+    
+    const touch = e.touches[0];
+    gameState.isDragging = true;
+    gameState.dragStartX = touch.clientX;
+    gameState.dragStartY = touch.clientY;
+});
+
+window.addEventListener('touchmove', (e) => {
+    if (!gameState.isDragging || !gameState.gameStarted || gameState.isGameOver) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - gameState.dragStartX;
+    const deltaY = touch.clientY - gameState.dragStartY;
+    
+    // ドラッグの移動量が閾値を超えた場合のみ処理
+    if (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold) {
+        // 移動方向を判定
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // 横方向の移動が大きい
+            gameState.keysPressed['ArrowLeft'] = deltaX < 0;
+            gameState.keysPressed['ArrowRight'] = deltaX > 0;
+        } else {
+            // 縦方向の移動が大きい
+            gameState.keysPressed['ArrowUp'] = deltaY < 0;
+            gameState.keysPressed['ArrowDown'] = deltaY > 0;
+        }
+    }
+});
+
+window.addEventListener('touchend', () => {
+    if (gameState.isDragging) {
+        gameState.isDragging = false;
+        // ドラッグ終了時に全ての方向キーをリセット
+        gameState.keysPressed['ArrowUp'] = false;
+        gameState.keysPressed['ArrowDown'] = false;
+        gameState.keysPressed['ArrowLeft'] = false;
+        gameState.keysPressed['ArrowRight'] = false;
+    }
 });
 
 // ウィンドウリサイズ時の処理
@@ -2537,6 +2715,14 @@ function showGameScreen() {
         infoElement.style.opacity = '1';
     }
     
+    // モバイルデバイスの場合、ジョイスティックを表示
+    if (window.innerWidth <= 968) {
+        const mobileJoystick = document.getElementById('mobileJoystick');
+        if (mobileJoystick) {
+            mobileJoystick.style.display = 'block';
+        }
+    }
+    
     gameState.gameStarted = true;
     gameState.videoPlaying = false;
     gameState.gameStartTime = Date.now(); // ゲーム開始時刻を記録
@@ -2616,6 +2802,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const startScreen = document.getElementById('startScreen');
     const introVideo = document.getElementById('introVideo');
     const loadingText = document.getElementById('loadingText');
+    
+    // モバイルコントロールの初期化
+    initializeMobileControls();
     
     // 初期状態でローディング中を表示
     if (loadingText) {

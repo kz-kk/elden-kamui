@@ -53,7 +53,7 @@ export function updateDragon(gameState) {
     gameState.dragonState.actionTimer++;
 
     // モード切り替えの判定
-    console.log("ドラゴンモード:", gameState.dragonState.currentMode, "タイマー:", gameState.dragonState.actionTimer);
+    // console.log("ドラゴンモード:", gameState.dragonState.currentMode, "タイマー:", gameState.dragonState.actionTimer);
     
     if (gameState.dragonState.currentMode === 'fly') {
         if (gameState.dragonState.actionTimer >= gameState.dragonState.flyDuration) {
