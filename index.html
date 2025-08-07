@@ -308,6 +308,11 @@
             z-index: 1000;
         }
         
+        /* data属性を使用した安全な背景画像設定 */
+        #startScreen[data-bg-pc] {
+            background-image: attr(data-bg-pc url);
+        }
+        
         #startScreen::before {
             content: '';
             position: absolute;
@@ -580,8 +585,8 @@
         
         /* モバイル対応 - 968px以下でsplash_spに切り替え */
         @media screen and (max-width: 968px) {
-            #startScreen {
-                /* background-image will be set dynamically */
+            #startScreen[data-bg-sp] {
+                background-image: attr(data-bg-sp url) !important;
             }
             
             #bottomControls {
@@ -620,7 +625,7 @@
         /* モバイル用アクションボタン */
         #mobileActionButtons {
             position: fixed;
-            bottom: 100px;
+            bottom: 20px;
             right: 20px;
             display: none;
             flex-direction: column;
@@ -774,24 +779,32 @@
                 faviconLink.href = getAssetPath('assets/images/favicon.png');
             }
             
-            // スタート画面の背景画像を設定
+            // スタート画面の背景画像を安全に設定
             const startScreen = document.getElementById('startScreen');
             if (startScreen) {
-                // デスクトップ版の背景
+                // data属性を使用した安全な背景画像設定
                 const pcImageUrl = getAssetPath('assets/images/splash_pc.png');
-                startScreen.style.backgroundImage = `url('${pcImageUrl}')`;
-                
-                // モバイル版の背景（メディアクエリ対応）
                 const spImageUrl = getAssetPath('assets/images/splash_sp.png');
-                const style = document.createElement('style');
-                style.textContent = `
-                    @media screen and (max-width: 968px) {
-                        #startScreen {
-                            background-image: url('${spImageUrl}') !important;
+                
+                // data属性に設定（CSS側で参照）
+                startScreen.setAttribute('data-bg-pc', pcImageUrl);
+                startScreen.setAttribute('data-bg-sp', spImageUrl);
+                
+                // フォールバック: CSSのattr()が未サポートの場合はstyleで直接設定
+                if (!CSS.supports('background-image', 'attr(data-bg-pc url)')) {
+                    startScreen.style.backgroundImage = `url('${pcImageUrl}')`;
+                    
+                    // モバイル版のフォールバック
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        @media screen and (max-width: 968px) {
+                            #startScreen {
+                                background-image: url('${spImageUrl}') !important;
+                            }
                         }
-                    }
-                `;
-                document.head.appendChild(style);
+                    `;
+                    document.head.appendChild(style);
+                }
             }
             
             // 動画ソースを設定
