@@ -269,7 +269,7 @@ export function checkCollisions(gameState, isRollingAnimationPlaying) {
             
             // 雷の当たり判定（半径2.0単位）
             if (distanceToLightning < 2.0) {
-                console.log(`落ちてくる雷との衝突を検出！距離: ${distanceToLightning.toFixed(2)}`);
+                // console.log(`落ちてくる雷との衝突を検出！距離: ${distanceToLightning.toFixed(2)}`);
                 
                 // ダメージを与える
                 applyDamage(gameState, gameState.lightningStrikeDamage, gameOver);

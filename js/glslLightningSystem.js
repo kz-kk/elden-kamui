@@ -310,11 +310,6 @@ export class GLSLLightningSystem {
     if (error !== this.gl.NO_ERROR) {
       console.error("Uniform設定後のWebGLエラー:", error);
     }
-
-    // 雷攻撃時のみログ出力
-    if (this.currentPoints > 0) {
-      console.log("雷描画実行 - 点数:", this.currentPoints, "時間:", this.time);
-    }
     
     // ライン描画（WebGLの制限を考慮した太さ）
     // 多重描画でより強いグロー効果を演出
@@ -382,7 +377,7 @@ export class GLSLLightningSystem {
     this.gl.disable(this.gl.BLEND);
     this.gl.enable(this.gl.DEPTH_TEST);
     
-    console.log("render完了");
+    // console.log("render完了");
   }
 
   bindBuffers() {
@@ -396,7 +391,7 @@ export class GLSLLightningSystem {
   }
 
   emit(position, count = 10) {
-    console.log("GLSLLightningSystem.emit呼び出し:", position, count);
+    // console.log("GLSLLightningSystem.emit呼び出し:", position, count);
     for (let i = 0; i < count && i < this.particleCount; i++) {
       const particle = this.particles[i];
       particle.position = [
@@ -418,8 +413,8 @@ export class GLSLLightningSystem {
   }
 
   strikeTarget(startPosition, targetPosition, segmentCount = 60) {
-    console.log("========== strikeTarget関数開始 ==========");
-    console.log("激しい落雷開始:", startPosition, "→", targetPosition);
+    // console.log("========== strikeTarget関数開始 ==========");
+    // console.log("激しい落雷開始:", startPosition, "→", targetPosition);
     
     // 距離と方向を計算
     const dx = targetPosition[0] - startPosition[0];
@@ -427,7 +422,7 @@ export class GLSLLightningSystem {
     const dz = targetPosition[2] - startPosition[2];
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
     
-    console.log("落雷の距離:", distance);
+    // console.log("落雷の距離:", distance);
     
     const positions = [];
     const intensities = [];
@@ -566,10 +561,10 @@ export class GLSLLightningSystem {
       intensityArray[i] = intensities[i];
     }
     
-    console.log("バッファ更新前");
+    // console.log("バッファ更新前");
     this.updateBuffer(this.buffers.position, positionArray);
     this.updateBuffer(this.buffers.intensity, intensityArray);
-    console.log("バッファ更新完了");
+    // console.log("バッファ更新完了");
     
     // 雷音再生はmain.jsで処理される
     
@@ -578,7 +573,6 @@ export class GLSLLightningSystem {
     this.lightningStartTime = performance.now();
     this.lightningTargetPosition = targetPosition;
     
-    console.log("激しい稲妻生成完了 - 点数:", this.currentPoints, "表示開始時刻:", this.lightningStartTime);
   }
   
   createExplosionShaderProgram() {
@@ -586,10 +580,8 @@ export class GLSLLightningSystem {
       precision mediump float;
       
       attribute vec3 a_position;
-      attribute vec3 a_velocity;
       attribute float a_life;
       attribute float a_size;
-      attribute float a_angle;
       
       uniform mat4 u_projectionMatrix;
       uniform mat4 u_viewMatrix;
@@ -738,16 +730,12 @@ export class GLSLLightningSystem {
     // 最大バッファーサイズを大きくして、複数の線を収容できるようにする
     const maxParticles = 1000; // 500から1000に増加
     const positions = new Float32Array(maxParticles * 3);
-    const velocities = new Float32Array(maxParticles * 3);
     const lifetimes = new Float32Array(maxParticles);
     const sizes = new Float32Array(maxParticles);
-    const angles = new Float32Array(maxParticles);
     
     this.explosionBuffers.position = this.createExplosionBuffer(positions, 'a_position', 3);
-    this.explosionBuffers.velocity = this.createExplosionBuffer(velocities, 'a_velocity', 3);
     this.explosionBuffers.life = this.createExplosionBuffer(lifetimes, 'a_life', 1);
     this.explosionBuffers.size = this.createExplosionBuffer(sizes, 'a_size', 1);
-    this.explosionBuffers.angle = this.createExplosionBuffer(angles, 'a_angle', 1);
     
     this.maxExplosionParticles = maxParticles;
   }
@@ -762,14 +750,31 @@ export class GLSLLightningSystem {
     const location = this.gl.getAttribLocation(this.explosionProgram, attributeName);
     
     if (location === -1) {
-      console.warn(`属性 ${attributeName} が見つかりません`);
+      console.warn(`属性 ${attributeName} が見つかりません - シェーダーで使用されていない可能性があります`);
+      
+      // シェーダーソースを確認してデバッグ情報を表示
+      const programStatus = this.gl.getProgramParameter(this.explosionProgram, this.gl.LINK_STATUS);
+      const programLog = this.gl.getProgramInfoLog(this.explosionProgram);
+      
+      console.debug('シェーダープログラム状態:', programStatus);
+      if (programLog) {
+        console.debug('シェーダープログラムログ:', programLog);
+      }
+      
+      // アクティブな属性を列挙してデバッグ
+      const numAttributes = this.gl.getProgramParameter(this.explosionProgram, this.gl.ACTIVE_ATTRIBUTES);
+      console.debug('アクティブな属性数:', numAttributes);
+      for (let i = 0; i < numAttributes; i++) {
+        const info = this.gl.getActiveAttrib(this.explosionProgram, i);
+        console.debug(`属性 ${i}: ${info.name}, タイプ: ${info.type}, サイズ: ${info.size}`);
+      }
     }
     
     return { buffer, location, size };
   }
   
   addExplosion(position) {
-    console.log("addExplosion呼び出し - 位置:", position);
+    // console.log("addExplosion呼び出し - 位置:", position);
     
     const explosion = {
       position: [...position],
@@ -787,7 +792,7 @@ export class GLSLLightningSystem {
     const upwardLineCount = 8; // 上向き放電線を追加
     const pointsPerLine = 10;
     
-    console.log(`${groundLineCount + upwardLineCount}本の放電線を生成中（地面${groundLineCount}本、上空${upwardLineCount}本）...`);
+    // console.log(`${groundLineCount + upwardLineCount}本の放電線を生成中（地面${groundLineCount}本、上空${upwardLineCount}本）...`);
     
     // === 地面放電（既存の処理） ===
     for (let i = 0; i < groundLineCount; i++) {
@@ -849,7 +854,7 @@ export class GLSLLightningSystem {
       }
       
       explosion.lines.push(line);
-      console.log(`地面線${i}: ${line.points.length}ポイント生成`);
+      // console.log(`地面線${i}: ${line.points.length}ポイント生成`);
     }
     
     // === 上向き放電（新規追加） ===
@@ -901,10 +906,10 @@ export class GLSLLightningSystem {
       }
       
       explosion.lines.push(line);
-      console.log(`上向き線${i}: ${line.points.length}ポイント生成（高さ${upwardHeight.toFixed(2)}）`);
+      // console.log(`上向き線${i}: ${line.points.length}ポイント生成（高さ${upwardHeight.toFixed(2)}）`);
     }
     
-    console.log(`爆発エフェクト生成完了 - 総線数: ${explosion.lines.length}`);
+    // console.log(`爆発エフェクト生成完了 - 総線数: ${explosion.lines.length}`);
     
     // ダメージ判定の設定（範囲をさらに狭く）
     if (window.gameState) {
@@ -922,7 +927,7 @@ export class GLSLLightningSystem {
       this.explosions.shift();
     }
     
-    console.log("地面拡散エフェクト追加:", position, "爆発配列サイズ:", this.explosions.length);
+    // console.log("地面拡散エフェクト追加:", position, "爆発配列サイズ:", this.explosions.length);
   }
   
   renderExplosions(projectionMatrix, viewMatrix) {
@@ -930,7 +935,7 @@ export class GLSLLightningSystem {
       return;
     }
     
-    console.log(`爆発エフェクト描画開始 - 爆発数: ${this.explosions.length}`);
+    // console.log(`爆発エフェクト描画開始 - 爆発数: ${this.explosions.length}`);
     
     this.gl.useProgram(this.explosionProgram);
     
@@ -954,11 +959,11 @@ export class GLSLLightningSystem {
       const age = this.time - explosion.startTime;
       
       if (age > this.explosionDuration / 1000) {
-        console.log(`爆発${expIdx}は期限切れ (age: ${age.toFixed(3)})`);
+        // console.log(`爆発${expIdx}は期限切れ (age: ${age.toFixed(3)})`);
         continue;
       }
       
-      console.log(`爆発${expIdx}描画中 - age: ${age.toFixed(3)}, 線数: ${explosion.lines.length}`);
+      // console.log(`爆発${expIdx}描画中 - age: ${age.toFixed(3)}, 線数: ${explosion.lines.length}`);
       
       this.gl.uniform3fv(this.explosionUniforms.explosionCenter, explosion.position);
       
@@ -974,10 +979,8 @@ export class GLSLLightningSystem {
         
         // 線の頂点データを作成
         const linePositions = new Float32Array(line.points.length * 3);
-        const lineVelocities = new Float32Array(line.points.length * 3);
         const lineLifetimes = new Float32Array(line.points.length);
         const lineSizes = new Float32Array(line.points.length);
-        const lineAngles = new Float32Array(line.points.length);
         
         for (let i = 0; i < line.points.length; i++) {
           const p = line.points[i];
@@ -985,22 +988,15 @@ export class GLSLLightningSystem {
           linePositions[i * 3 + 1] = p.position[1];
           linePositions[i * 3 + 2] = p.position[2];
           
-          lineVelocities[i * 3] = p.velocity[0];
-          lineVelocities[i * 3 + 1] = p.velocity[1];
-          lineVelocities[i * 3 + 2] = p.velocity[2];
-          
           lineLifetimes[i] = p.life;
           lineSizes[i] = p.size;
-          lineAngles[i] = p.angle || 0;
         }
         
         // バッファーをバインドして更新（エラーチェック付き）
         try {
           this.bindExplosionBuffer(this.explosionBuffers.position, linePositions);
-          this.bindExplosionBuffer(this.explosionBuffers.velocity, lineVelocities);
           this.bindExplosionBuffer(this.explosionBuffers.life, lineLifetimes);
           this.bindExplosionBuffer(this.explosionBuffers.size, lineSizes);
-          this.bindExplosionBuffer(this.explosionBuffers.angle, lineAngles);
           
           // WebGLエラーチェック
           let error = this.gl.getError();
@@ -1025,7 +1021,7 @@ export class GLSLLightningSystem {
       }
     }
     
-    console.log(`爆発エフェクト描画完了 - 描画した線数: ${totalLinesDrawn}`);
+    // console.log(`爆発エフェクト描画完了 - 描画した線数: ${totalLinesDrawn}`);
     
     // 古い爆発を削除
     this.explosions = this.explosions.filter(exp => {
@@ -1038,7 +1034,7 @@ export class GLSLLightningSystem {
   }
   
   bindExplosionBuffer(bufferInfo, data) {
-    if (bufferInfo.location === -1) {
+    if (!bufferInfo || bufferInfo.location === -1) {
       return; // 無効な属性ロケーションをスキップ
     }
     

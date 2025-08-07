@@ -55,12 +55,12 @@ class AssetLoader {
         this.totalAssets = Object.keys(ASSETS.models).length + Object.keys(ASSETS.sounds).length;
         gameState.totalAssets = this.totalAssets;
         
-        console.log(`Total assets to load: ${this.totalAssets}`);
+        // console.log(`Total assets to load: ${this.totalAssets}`);
     }
     
     loadModel(key, onSuccess, onError) {
         const path = getAssetPath(ASSETS.models[key]);
-        console.log(`Loading model: ${key} from ${path}`);
+        // console.log(`Loading model: ${key} from ${path}`);
         
         this.gltfLoader.load(
             path,
@@ -79,7 +79,7 @@ class AssetLoader {
     
     loadSound(key, onSuccess, onError) {
         const path = getAssetPath(ASSETS.sounds[key]);
-        console.log(`Loading sound: ${key} from ${path}`);
+        // console.log(`Loading sound: ${key} from ${path}`);
         
         this.audioLoader.load(
             path,
@@ -119,7 +119,7 @@ class AssetLoader {
         this.loadedAssets++;
         const progress = Math.min((this.loadedAssets / this.totalAssets) * 100, 100);
         
-        console.log(`Asset loaded: ${assetName} (${this.loadedAssets}/${this.totalAssets} = ${Math.floor(progress)}%)`);
+        // console.log(`Asset loaded: ${assetName} (${this.loadedAssets}/${this.totalAssets} = ${Math.floor(progress)}%)`);
         
         // プログレスバー更新
         gameState.loadedAssets = this.loadedAssets;
@@ -145,7 +145,7 @@ class AssetLoader {
         
         // すべてのアセットが読み込まれたら完了処理
         if (this.loadedAssets >= this.totalAssets && gameState.isLoading) {
-            console.log('All assets loaded! Finalizing...');
+            // console.log('All assets loaded! Finalizing...');
             gameState.isLoading = false;
             document.getElementById('loading').style.display = 'none';
             onLoadingComplete();
@@ -1335,7 +1335,7 @@ if (assetLoader) {
             // ドラゴンモデルの読み込み試行
             try {
                 updateLoadingProgress('Loading dragon model...');
-                console.log('Starting dragon model load...');
+                // console.log('Starting dragon model load...');
                 assetLoader.loadModel('dragon_fly', (gltf) => {
 
                     // console.log("ドラゴンモデル読み込み成功:", gltf);
@@ -1416,7 +1416,7 @@ if (assetLoader) {
                     }
                     
                     // ドラゴンモデル読み込み完了（ただし、他のアセットの読み込みを待つ必要がある）
-                    console.log('Dragon model loaded, checking if all assets are loaded...');
+                    // console.log('Dragon model loaded, checking if all assets are loaded...');
                 }, 
                 (xhr) => {
                     // console.log((xhr.loaded / xhr.total * 100) + '% ドラゴンモデル読み込み中...');
@@ -2900,7 +2900,7 @@ function showGameScreen() {
 // ローディング進行状況を更新する関数（旧システム - 無効化）
 function updateLoadingProgress(message) {
     // 新しいAssetLoaderシステムを使用するため、この関数は何もしない
-    console.log(`Legacy loading message: ${message}`);
+    // console.log(`Legacy loading message: ${message}`);
 }
 
 // プログレスバーを更新する関数（旧システム - 無効化）
@@ -3070,7 +3070,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 動画再生開始成功時にスタート画面を非表示
                     startScreen.style.display = 'none';
                     introVideo.style.display = 'block';
-                    console.log('ビデオ再生開始成功');
+                    // console.log('ビデオ再生開始成功');
                 }).catch((error) => {
                     console.error('ビデオ再生エラー:', error);
                     // ビデオ再生に失敗した場合は直接ゲーム開始

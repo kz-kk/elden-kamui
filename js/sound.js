@@ -27,11 +27,11 @@ export function playFootstepSound(gameState) {
  * @param {Object} gameState - ゲームの状態オブジェクト
  */
 export function playButtonClickSound(gameState) {
-    console.log('playButtonClickSound関数が呼び出されました');
-    console.log('gameState.sounds:', gameState.sounds);
+    // console.log('playButtonClickSound関数が呼び出されました');
+    // console.log('gameState.sounds:', gameState.sounds);
     
     if (gameState.sounds.buttonClick && gameState.sounds.buttonClick.buffer) {
-        console.log('btn.mp3の再生を開始します');
+        // console.log('btn.mp3の再生を開始します');
         // 既に再生中なら停止して最初から再生
         if (gameState.sounds.buttonClick.isPlaying) {
             gameState.sounds.buttonClick.stop();
@@ -39,10 +39,10 @@ export function playButtonClickSound(gameState) {
         // ミュート状態の場合は音量を0に、そうでなければ固定音量
         const volume = gameState.isMuted ? 0 : 0.3;
         gameState.sounds.buttonClick.setVolume(volume);
-        console.log('btn.mp3の音量設定:', volume);
+        // console.log('btn.mp3の音量設定:', volume);
         // 再生
         gameState.sounds.buttonClick.play();
-        console.log('btn.mp3の再生コマンドを実行しました');
+        // console.log('btn.mp3の再生コマンドを実行しました');
     } else {
         console.error('btn.mp3が読み込まれていないか、バッファが設定されていません:', {
             hasButtonClick: !!(gameState.sounds && gameState.sounds.buttonClick),

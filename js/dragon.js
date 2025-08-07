@@ -283,7 +283,7 @@ export function updateDragon(gameState) {
                     gameState.sounds.dragonVoice.stop();
                 }
                 gameState.sounds.dragonVoice.play();
-                console.log('ドラゴンボイス再生: dragon-voice1.mp3');
+                
             }
             
             // クールダウンをリセット
