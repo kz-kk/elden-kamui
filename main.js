@@ -127,13 +127,20 @@ class AssetLoader {
         
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
+        const mobileProgressText = document.getElementById('mobileProgressText');
         
         if (progressBar) {
             progressBar.style.width = progress + '%';
         }
         
+        const progressPercentage = Math.floor(progress) + '%';
         if (progressText) {
-            progressText.textContent = Math.floor(progress) + '%';
+            progressText.textContent = progressPercentage;
+        }
+        
+        // スマホ用の%表示も更新
+        if (mobileProgressText) {
+            mobileProgressText.textContent = progressPercentage;
         }
         
         // すべてのアセットが読み込まれたら完了処理
@@ -2836,7 +2843,10 @@ function showGameScreen() {
     const introVideo = document.getElementById('introVideo');
     if (introVideo) {
         introVideo.style.display = 'none';
-        introVideo.pause();
+        // 再生中の場合のみpause()を呼び出し
+        if (!introVideo.paused) {
+            introVideo.pause();
+        }
         introVideo.currentTime = 0; // ビデオを最初に巻き戻し
     }
     
@@ -2907,7 +2917,9 @@ function onLoadingComplete() {
     // プログレスバーとパーセンテージを非表示
     const progressContainer = document.getElementById('progressContainer');
     const progressText = document.getElementById('progressText');
+    const mobileProgressText = document.getElementById('mobileProgressText');
     const loadingText = document.getElementById('loadingText');
+    const loadingTextContainer = document.getElementById('loadingTextContainer');
     
     if (progressContainer) {
         progressContainer.style.display = 'none';
@@ -2917,8 +2929,16 @@ function onLoadingComplete() {
         progressText.style.display = 'none';
     }
     
+    if (mobileProgressText) {
+        mobileProgressText.style.display = 'none';
+    }
+    
     if (loadingText) {
         loadingText.style.display = 'none';
+    }
+    
+    if (loadingTextContainer) {
+        loadingTextContainer.style.display = 'none';
     }
     
     // STARTボタンを表示・有効化
@@ -2954,11 +2974,16 @@ document.addEventListener('DOMContentLoaded', function() {
     gameState.loadedAssets = 0;
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
+    const mobileProgressText = document.getElementById('mobileProgressText');
+    
     if (progressBar) {
         progressBar.style.width = '0%';
     }
     if (progressText) {
         progressText.textContent = '0%';
+    }
+    if (mobileProgressText) {
+        mobileProgressText.textContent = '0%';
     }
     
     if (startButton && startScreen && introVideo) {
@@ -2973,6 +2998,10 @@ document.addEventListener('DOMContentLoaded', function() {
             introVideo.addEventListener('ended', function() {
                 // console.log('ビデオ再生完了');
                 gameState.videoPlaying = false;
+                // 再生が既に停止している場合の追加チェック
+                if (!introVideo.paused) {
+                    introVideo.pause();
+                }
                 if (!gameState.gameStarted) {
                     showGameScreen();
                 }
@@ -2981,7 +3010,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // ビデオをクリックしてスキップ可能
             introVideo.addEventListener('click', function() {
                 // console.log('ビデオスキップ');
-                introVideo.pause();
+                // 再生中の場合のみpause()を呼び出し
+                if (!introVideo.paused) {
+                    introVideo.pause();
+                }
                 gameState.videoPlaying = false;
                 if (!gameState.gameStarted) {
                     // 少し遅延を入れてから画面遷移（スムーズな切り替えのため）
@@ -3011,23 +3043,34 @@ document.addEventListener('DOMContentLoaded', function() {
             startButton.disabled = true;
             startButton.textContent = 'Loading...';
             
-            // 2秒待ってから動画画面に遷移
-            setTimeout(() => {
-                // スタート画面を非表示
-                startScreen.style.display = 'none';
+            // 動画の準備と再生を開始
+            gameState.videoPlaying = true;
+            
+            // ミュート状態を動画にも適用
+            introVideo.muted = gameState.isMuted;
                 
-                // ビデオを表示して再生開始
-                introVideo.style.display = 'block';
-                gameState.videoPlaying = true;
-                
-                // ミュート状態を動画にも適用
-                introVideo.muted = gameState.isMuted;
-                
-                // ビデオイベントを設定
-                setupVideoEvents();
+            // ビデオイベントを設定
+            setupVideoEvents();
+            
+            // ビデオの準備ができるまで待つ
+            if (introVideo.readyState >= 2) { // HAVE_CURRENT_DATA以上
+                // すぐに再生開始
+                playVideoSafely();
+            } else {
+                // データの読み込みを待つ
+                introVideo.addEventListener('canplay', playVideoSafely, { once: true });
+                introVideo.load(); // 動画を再読み込み
+            }
+            
+            function playVideoSafely() {
+                // 既にゲームが開始されている場合は再生しない
+                if (gameState.gameStarted || !gameState.videoPlaying) return;
                 
                 introVideo.play().then(() => {
-    
+                    // 動画再生開始成功時にスタート画面を非表示
+                    startScreen.style.display = 'none';
+                    introVideo.style.display = 'block';
+                    console.log('ビデオ再生開始成功');
                 }).catch((error) => {
                     console.error('ビデオ再生エラー:', error);
                     // ビデオ再生に失敗した場合は直接ゲーム開始
@@ -3036,7 +3079,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         showGameScreen();
                     }
                 });
-            }, 1000); // 2秒（2000ミリ秒）の遅延
+            }
         });
     }
 });

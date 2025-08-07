@@ -171,16 +171,49 @@ export function restartGame(gameState, scene) {
     // 体力インジケーターを更新
     updateHealthBar(gameState);
     
+    // ドラゴンの体力バーを再表示
+    const dragonContainer = document.getElementById('dragonHealthContainer');
+    if (dragonContainer) {
+        dragonContainer.style.display = 'block';
+    }
+    
     // モバイルデバイスの場合、ジョイスティックとアクションボタンを再表示
-    if (window.innerWidth <= 968) {
-        const mobileJoystick = document.getElementById('mobileJoystick');
+    const isMobile = window.innerWidth <= 968 || window.matchMedia('(max-width: 968px)').matches;
+    console.log('リスタート時のモバイル判定:', { 
+        windowWidth: window.innerWidth, 
+        mediaQuery: window.matchMedia('(max-width: 968px)').matches,
+        isMobile 
+    });
+    
+    // モバイルUI要素を取得
+    const mobileJoystick = document.getElementById('mobileJoystick');
+    const mobileActionButtons = document.getElementById('mobileActionButtons');
+    
+    if (isMobile) {
         if (mobileJoystick) {
             mobileJoystick.style.display = 'block';
+            console.log('ジョイスティックを再表示しました');
+        } else {
+            console.log('ジョイスティック要素が見つかりません');
         }
         
-        const mobileActionButtons = document.getElementById('mobileActionButtons');
         if (mobileActionButtons) {
             mobileActionButtons.style.display = 'flex';
+            console.log('アクションボタンを再表示しました');
+        } else {
+            console.log('アクションボタン要素が見つかりません');
+        }
+    } else {
+        console.log('デスクトップ環境のため、モバイルUIは表示しません');
+        // デスクトップでもフォールバック: タッチ操作が可能な場合は表示
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            console.log('タッチデバイス検出、モバイルUIを表示します');
+            if (mobileJoystick) {
+                mobileJoystick.style.display = 'block';
+            }
+            if (mobileActionButtons) {
+                mobileActionButtons.style.display = 'flex';
+            }
         }
     }
     
@@ -253,12 +286,7 @@ export function setupWinButton(gameState, scene) {
         // 勝利画面を非表示
         document.getElementById('winScreen').style.display = 'none';
         
-        // ドラゴンの体力バーを再表示
-        const dragonContainer = document.getElementById('dragonHealthContainer');
-        if (dragonContainer) {
-            dragonContainer.style.display = 'block';
-        }
-        
+        // restartGame関数で全ての再表示処理を行う
         restartGame(gameState, scene);
     });
 } 
