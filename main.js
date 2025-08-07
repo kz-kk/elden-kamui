@@ -1813,6 +1813,10 @@ function initializeMobileControls() {
     const mobileLeft = document.getElementById('mobileLeft');
     const mobileRight = document.getElementById('mobileRight');
     
+    // モバイルアクションボタンの初期化
+    const mobileAttackButton = document.getElementById('mobileAttackButton');
+    const mobileRollingButton = document.getElementById('mobileRollingButton');
+    
     // console.log('モバイルコントロール初期化:', { mobileUp, mobileLeft, mobileRight });
 
     // マウスイベント（PCでもスマホでも動作）
@@ -1882,6 +1886,52 @@ function initializeMobileControls() {
         mobileRight.addEventListener('touchend', (e) => {
             e.preventDefault();
             gameState.keysPressed['ArrowRight'] = false;
+        });
+    }
+    
+    // モバイル攻撃ボタンのイベントリスナー
+    if (mobileAttackButton) {
+        mobileAttackButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['f'] = true;
+        });
+        mobileAttackButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['f'] = false;
+        });
+        mobileAttackButton.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['f'] = true;
+        });
+        mobileAttackButton.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['f'] = false;
+        });
+        mobileAttackButton.addEventListener('mouseleave', (e) => {
+            gameState.keysPressed['f'] = false;
+        });
+    }
+    
+    // モバイルローリングボタンのイベントリスナー
+    if (mobileRollingButton) {
+        mobileRollingButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['r'] = true;
+        });
+        mobileRollingButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['r'] = false;
+        });
+        mobileRollingButton.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['r'] = true;
+        });
+        mobileRollingButton.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            gameState.keysPressed['r'] = false;
+        });
+        mobileRollingButton.addEventListener('mouseleave', (e) => {
+            gameState.keysPressed['r'] = false;
         });
     }
 }
@@ -2092,6 +2142,90 @@ function movePlayer() {
     if (gameState.keysPressed['ArrowRight']) {
         gameState.playerRotation -= gameState.playerRotationSpeed;
         isMoving = true;
+    }
+    
+    // 攻撃処理（Fキー）
+    if ((gameState.keysPressed['f'] || gameState.keysPressed['F']) && gameState.beamCooldown <= 0) {
+        // ビームエフェクトを生成
+        createBeamEffect(gameState, scene);
+        
+        // ビームの効果音を再生
+        if (gameState.sounds.attack && gameState.sounds.attack.buffer) {
+            if (gameState.sounds.attack.isPlaying) {
+                gameState.sounds.attack.stop();
+            }
+            gameState.sounds.attack.play();
+        }
+        
+        // クールダウンをリセット
+        gameState.beamCooldown = gameState.beamMaxCooldown;
+        
+        // ビームが発射されたフラグ
+        gameState.beamFired = true;
+        
+        // キーを押下状態から解除（連続発射を防ぐ）
+        gameState.keysPressed['f'] = false;
+        gameState.keysPressed['F'] = false;
+    }
+    
+    // ローリング処理（Rキー）
+    if ((gameState.keysPressed['r'] || gameState.keysPressed['R']) && !isRollingAnimationPlaying && !gameState.isRolling && gameState.rollingCooldown <= 0 && playerAnimations['rolling'] && gameState.playerModel) {
+        // 実行前のプレイヤー位置と回転を保存
+        const originalPosition = gameState.playerPosition.clone();
+        const originalRotation = gameState.playerRotation;
+        
+        // 移動方向を計算
+        const forwardX = Math.sin(gameState.playerRotation);
+        const forwardZ = Math.cos(gameState.playerRotation);
+        
+        // ローリング開始位置を設定（現在の位置から開始）
+        gameState.rollingStartPosition = originalPosition.clone();
+        
+        // 既存のアニメーションを停止
+        if (currentAnimation && typeof currentAnimation.stop === 'function') {
+            currentAnimation.stop();
+        }
+        
+        // 走りモデルを非表示にする
+        gameState.playerModel.visible = false;
+        if (playerAnimations['run'] && playerAnimations['run'].scene) {
+            scene.remove(playerAnimations['run'].scene);
+        }
+        
+        // ローリング専用モデルを表示
+        const rollingData = playerAnimations['rolling'];
+        rollingData.scene.position.copy(gameState.playerPosition);
+        rollingData.scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
+        scene.add(rollingData.scene);
+        
+        // ローリングアニメーションを設定
+        currentAnimation = rollingData.action;
+        currentAnimation.reset();
+        currentAnimation.timeScale = 1.5; // アニメーション速度を上げる
+        currentAnimation.setEffectiveTimeScale(1.5); // タイムスケールを明示的に設定
+        
+        // アニメーションの途中から開始（ジャンプの部分をスキップ）
+        const clipDuration = currentAnimation.getClip().duration;
+        currentAnimation.time = clipDuration * 0.3; // アニメーションの30%地点から開始
+        currentAnimation.play();
+        
+        // ローリング状態を設定
+        isRollingAnimationPlaying = true;
+        gameState.isRolling = true;
+        gameState.rollingCooldown = 15; // クールダウン設定（短縮）
+        
+        // ローリング音を再生（foot.mp3）
+        if (gameState.sounds.footstep && gameState.sounds.footstep.buffer) {
+            if (gameState.sounds.footstep.isPlaying) {
+                gameState.sounds.footstep.stop();
+            }
+            gameState.sounds.footstep.setVolume(0.8);
+            gameState.sounds.footstep.play();
+        }
+        
+        // キーを押下状態から解除（連続発射を防ぐ）
+        gameState.keysPressed['r'] = false;
+        gameState.keysPressed['R'] = false;
     }
     
     // ジャンプ処理
@@ -2715,11 +2849,16 @@ function showGameScreen() {
         infoElement.style.opacity = '1';
     }
     
-    // モバイルデバイスの場合、ジョイスティックを表示
+    // モバイルデバイスの場合、ジョイスティックとアクションボタンを表示
     if (window.innerWidth <= 968) {
         const mobileJoystick = document.getElementById('mobileJoystick');
         if (mobileJoystick) {
             mobileJoystick.style.display = 'block';
+        }
+        
+        const mobileActionButtons = document.getElementById('mobileActionButtons');
+        if (mobileActionButtons) {
+            mobileActionButtons.style.display = 'flex';
         }
     }
     

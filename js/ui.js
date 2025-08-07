@@ -85,10 +85,15 @@ export function gameOver(gameState) {
     const gameOverScreen = document.getElementById('gameOverScreen');
     gameOverScreen.style.display = 'flex';
     
-    // モバイルジョイスティックを非表示
+    // モバイルジョイスティックとアクションボタンを非表示
     const mobileJoystick = document.getElementById('mobileJoystick');
     if (mobileJoystick) {
         mobileJoystick.style.display = 'none';
+    }
+    
+    const mobileActionButtons = document.getElementById('mobileActionButtons');
+    if (mobileActionButtons) {
+        mobileActionButtons.style.display = 'none';
     }
     
     // console.log("ゲームオーバー！");
@@ -166,11 +171,16 @@ export function restartGame(gameState, scene) {
     // 体力インジケーターを更新
     updateHealthBar(gameState);
     
-    // モバイルデバイスの場合、ジョイスティックを再表示
+    // モバイルデバイスの場合、ジョイスティックとアクションボタンを再表示
     if (window.innerWidth <= 968) {
         const mobileJoystick = document.getElementById('mobileJoystick');
         if (mobileJoystick) {
             mobileJoystick.style.display = 'block';
+        }
+        
+        const mobileActionButtons = document.getElementById('mobileActionButtons');
+        if (mobileActionButtons) {
+            mobileActionButtons.style.display = 'flex';
         }
     }
     
@@ -214,10 +224,15 @@ export function showWinScreen(gameState) {
         dragonContainer.style.display = 'none';
     }
     
-    // モバイルジョイスティックを非表示
+    // モバイルジョイスティックとアクションボタンを非表示
     const mobileJoystick = document.getElementById('mobileJoystick');
     if (mobileJoystick) {
         mobileJoystick.style.display = 'none';
+    }
+    
+    const mobileActionButtons = document.getElementById('mobileActionButtons');
+    if (mobileActionButtons) {
+        mobileActionButtons.style.display = 'none';
     }
     
     console.log("You Win!");
