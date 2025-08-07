@@ -468,6 +468,7 @@
             flex-direction: column;
             align-items: center;
             gap: 20px;
+            width: 100%;
         }
         
         .spacer {
@@ -561,11 +562,11 @@
         <div id="bottomControls">
             <button id="startButton" style="display: none;">START</button>
             
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; position: relative;">
                 <div id="progressContainer" style="display: block;">
                     <div id="progressBar"></div>
                 </div>
-                <div id="progressText" style="display: block;">0%</div>
+                <div id="progressText" style="display: block; position: absolute; left: 315px; min-width: 40px; text-align: left;">0%</div>
             </div>
             <div id="loadingText">Loading...</div>
         </div>

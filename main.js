@@ -2579,18 +2579,30 @@ function onLoadingComplete() {
     
     // 音声はすでに初期化済み
     
+    // プログレスバーとパーセンテージを非表示
+    const progressContainer = document.getElementById('progressContainer');
+    const progressText = document.getElementById('progressText');
+    const loadingText = document.getElementById('loadingText');
+    
+    if (progressContainer) {
+        progressContainer.style.display = 'none';
+    }
+    
+    if (progressText) {
+        progressText.style.display = 'none';
+    }
+    
+    if (loadingText) {
+        loadingText.style.display = 'none';
+    }
+    
     // STARTボタンを表示・有効化
     const startButton = document.getElementById('startButton');
-    const loadingText = document.getElementById('loadingText');
     
     if (startButton) {
         startButton.style.display = 'block';
         startButton.disabled = false;
         startButton.textContent = 'START';
-    }
-    
-    if (loadingText) {
-        loadingText.textContent = 'Ready to Start!';
     }
     
     // ここでは自動でゲーム画面を表示しない
