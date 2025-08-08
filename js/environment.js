@@ -7,16 +7,23 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ========================================
 // アセットパス設定（main.jsと同期）
 // ========================================
-// 注意：この設定はmain.jsと同期させる必要があります
-const USE_LOCAL_ASSETS = false; // true: ローカルアセットを使用, false: 外部URLを使用
-const EXTERNAL_BASE_URL = 'https://elden-kamui.netlify.app';
-const LOCAL_BASE_PATH = '..';
-
+// 注意：main.jsと参照方法がずれないように保つ
 export function getAssetPath(relativePath) {
-    if (USE_LOCAL_ASSETS) {
-        return `${LOCAL_BASE_PATH}/${relativePath}`;
-    } else {
-        return `${EXTERNAL_BASE_URL}/${relativePath}`;
+    if (typeof relativePath !== 'string' || relativePath.length === 0) return '';
+    // すでに絶対URLならそのまま返す
+    if (/^https?:\/\//i.test(relativePath)) return relativePath;
+
+    try {
+        // モジュールが配信されているオリジンを最優先（Netlifyから環境を配信する構成のため）
+        const moduleOrigin = (typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.url)
+            ? new URL(import.meta.url).origin
+            : (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+        const base = (moduleOrigin ? moduleOrigin : '') + '/';
+        const sanitized = relativePath.replace(/^\/+/, '');
+        return new URL(sanitized, base).toString();
+    } catch (_) {
+        // 失敗時は相対のまま返す
+        return relativePath;
     }
 }
 import { PMREMGenerator } from 'three';

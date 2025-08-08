@@ -814,7 +814,7 @@ try {
 
 // 地面の作成（従来の平面に戻す）
 const groundGeometry = new THREE.PlaneGeometry(100, 100);
-const groundTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/dry_grassland.png');
+const groundTexture = new THREE.TextureLoader().load(getAssetPath('assets/area/dry_grassland.png'));
 groundTexture.wrapS = THREE.RepeatWrapping;
 groundTexture.wrapT = THREE.RepeatWrapping;
 groundTexture.repeat.set(10, 10);
@@ -865,7 +865,7 @@ addRocks(scene, gameState);
 
 // スカイボックスの作成
 const skyGeometry = new THREE.SphereGeometry(500, 60, 40);
-const skyTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/sunset.png');
+const skyTexture = new THREE.TextureLoader().load(getAssetPath('assets/area/sunset.png'));
 const skyMaterial = new THREE.MeshBasicMaterial({
     map: skyTexture,
     side: THREE.BackSide,
