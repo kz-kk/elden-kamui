@@ -888,7 +888,7 @@ class ChunkManager {
             
             // ワールド座標に変換
             const worldX = worldOffsetX + this.chunkSize / 2 + localX;
-            const worldZ = worldOffsetZ + this.chunkSize / 2 + localZ;
+            const worldZ = worldOffsetZ + this.chunkSize / 2 - localZ;
             
             // 地形の高さを取得
             const height = this.getHeightAtPosition(worldX, worldZ);
@@ -918,7 +918,49 @@ class ChunkManager {
         chunk.castShadow = true;
         chunk.receiveShadow = true;
         
-        return chunk;
+        // チャンクに草フィールドを追加
+        let chunkGrassField = null;
+        try {
+            const { mesh, update } = createGrassField({
+                count: 15000,  // チャンクサイズに応じて調整
+                areaSize: this.chunkSize * 0.8, // チャンクサイズの80%に配置
+                bladeWidth: 0.12,
+                bladeHeight: 0.5,
+                alphaTest: 0.6,
+                textureUrl: getAssetPath('assets/images/grass_blade.png'),
+                swayAmplitude: 0.06,
+                castShadow: false,
+                heightAt: (x, z) => {
+                    // ローカル座標をワールド座標に変換
+                    const worldX = worldOffsetX + this.chunkSize / 2 + x;
+                    const worldZ = worldOffsetZ + this.chunkSize / 2 - z;
+                    return this.getHeightAtPosition(worldX, worldZ);
+                },
+                baseY: -5.0
+            });
+            
+            // 草フィールドの位置を設定
+            mesh.position.set(
+                worldOffsetX + this.chunkSize / 2,
+                -5.0,
+                worldOffsetZ + this.chunkSize / 2
+            );
+            
+            chunkGrassField = { mesh, update };
+            scene.add(mesh);
+        } catch (e) {
+            console.warn('チャンクの草フィールド初期化に失敗:', e);
+        }
+        
+        // チャンクと草フィールドをグループ化
+        const chunkGroup = new THREE.Group();
+        chunkGroup.add(chunk);
+        if (chunkGrassField) {
+            // 草フィールドの更新関数を保存
+            chunkGroup.userData = { grassField: chunkGrassField };
+        }
+        
+        return chunkGroup;
     }
     
     updateChunks(playerPosition) {
@@ -951,7 +993,7 @@ class ChunkManager {
         }
         
         // 不要なチャンクを削除（削除距離を使用）
-        for (const [key, chunk] of this.chunks) {
+        for (const [key, chunkGroup] of this.chunks) {
             const [chunkX, chunkZ] = key.split(',').map(Number);
             const dx = Math.abs(chunkX - this.playerChunk.x);
             const dz = Math.abs(chunkZ - this.playerChunk.z);
@@ -959,9 +1001,31 @@ class ChunkManager {
             
             // 削除距離を超えたチャンクのみ削除
             if (distance > this.deleteDistance) {
-                this.scene.remove(chunk);
-                chunk.geometry.dispose();
-                chunk.material.dispose();
+                this.scene.remove(chunkGroup);
+                
+                // チャンクグループ内のすべての子オブジェクトを削除
+                chunkGroup.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(mat => mat.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                });
+                
+                // 草フィールドも削除
+                if (chunkGroup.userData && chunkGroup.userData.grassField) {
+                    this.scene.remove(chunkGroup.userData.grassField.mesh);
+                    if (chunkGroup.userData.grassField.mesh.geometry) {
+                        chunkGroup.userData.grassField.mesh.geometry.dispose();
+                    }
+                    if (chunkGroup.userData.grassField.mesh.material) {
+                        chunkGroup.userData.grassField.mesh.material.dispose();
+                    }
+                }
+                
                 this.chunks.delete(key);
                 console.log(`チャンクを削除: ${key} (距離: ${distance})`);
             }
@@ -1001,8 +1065,8 @@ class ChunkManager {
             height *= flattenFactor; // 境界に近づくほど平地に
         }
         
-        // 基準レベル(-5.0)からの相対高度として返す
-        return height - 5.0;
+        // 相対高度（チャンクの基準Yは別途 -5.0 を加味する）
+        return height;
     }
     
     // 本格的なパーリンノイズ実装（連続性を保証）
@@ -1092,46 +1156,10 @@ console.log("無限地形システムを再有効化しました");
 // TODO: チャンクごとに草を生成するように修正
 // addGrass(scene, gameState);
 
-// GrassField を追加（Netlify 配信想定のブレードテクスチャ）
+// 中央の草フィールドは無効化（チャンクベースに移行）
 let grassField = null;
-try {
-    const { mesh, update } = createGrassField({
-        count: 80000,
-        areaSize: 100,
-        bladeWidth: 0.14,
-        bladeHeight: 1.1,
-        alphaTest: 0.15,
-        // Netlify 上のパスを `getAssetPath` で解決
-        textureUrl: getAssetPath('assets/images/grass_blade.png'),
-        wind: new THREE.Vector2(0.8, 0.3),
-        noiseScale: 0.5,
-        swayAmplitude: 0.07,
-        castShadow: false,
-        heightAt: (x, z) => {
-            // GrassField はローカル中心座標で生成するため、
-            // ワールド座標 = mesh.position + ローカル(x,z) とする。
-            // ここではメッシュを原点に置く前提で、そのまま使用する。
-            if (gameState.chunkManager) {
-                // 地形の高さを取得（基準レベルからの相対高度）
-                const terrainHeight = gameState.chunkManager.getHeightAtPosition(x, z);
-                return terrainHeight; // 基準レベルからの相対高度をそのまま使用
-            }
-            return gameState.groundLevel;
-        },
-        baseY: 0.0, // 地形追従するのでベースオフセットは不要
-    });
-    // 草メッシュの原点は(0,0,0)。各インスタンスで高さに合わせているので原点は0でOK
-    mesh.position.set(0, 0, 0);
-    scene.add(mesh);
-    grassField = { mesh, update };
-    // 草メッシュ全体の位置は基準レベルに配置
-    mesh.position.y = -5.0; // 基準レベルに配置（heightAtで個別調整済み）
-} catch (e) {
-    console.warn('GrassField の初期化に失敗:', e);
-}
 
-// 岩を配置
-// TODO: チャンクごとに岩を配置するように修正
+// 岩の配置は無効化（チャンクベースに移行）
 // addRocks(scene, gameState);
 
 // スカイボックスの作成
@@ -1360,7 +1388,7 @@ if (assetLoader) {
                             // モデルの位置を調整
                             runGltf.scene.position.set(
                                 gameState.playerPosition.x,
-                                gameState.groundLevel, // 調整値を変更（高さを下げる）
+                                gameState.playerPosition.y, // 実際の地形に合わせた高さ
                                 gameState.playerPosition.z
                             );
                             
@@ -2452,8 +2480,8 @@ function movePlayer() {
             gameState.playerPosition.x,
             gameState.playerPosition.z
         );
-        // プレイヤーを地形表面に配置
-        gameState.playerPosition.y = terrainY;
+        // プレイヤーを地形表面に配置（基準レベル + 相対高度）
+        gameState.playerPosition.y = -5.0 + terrainY;
     } else {
         gameState.playerPosition.y = gameState.groundLevel;
     }
@@ -2649,7 +2677,7 @@ function movePlayer() {
                 
                 // 走りモデルの位置と回転を設定
                 playerAnimations['run'].scene.position.copy(gameState.playerPosition);
-                playerAnimations['run'].scene.position.y = gameState.groundLevel; // Y座標を明示的に設定
+                playerAnimations['run'].scene.position.y = gameState.playerPosition.y; // 実際の高さを使用
                 playerAnimations['run'].scene.rotation.y = gameState.playerRotation + gameState.playerModelRotationOffset;
             }
             
@@ -2746,9 +2774,19 @@ function animate() {
     // 各種エフェクトを更新
     updateAllEffects(gameState, scene);
 
-    // GrassField の更新（風アニメーション）
+    // 中央の草フィールドの更新（風アニメーション）
     if (grassField && typeof grassField.update === 'function') {
         grassField.update(clock.elapsedTime);
+    }
+    
+    // 全チャンクの草フィールドを更新（風アニメーション）
+    if (gameState.chunkManager && gameState.chunkManager.chunks) {
+        gameState.chunkManager.chunks.forEach((chunkGroup) => {
+            if (chunkGroup.userData && chunkGroup.userData.grassField && 
+                typeof chunkGroup.userData.grassField.update === 'function') {
+                chunkGroup.userData.grassField.update(clock.elapsedTime);
+            }
+        });
     }
 
     // クールダウンタイマーの更新
