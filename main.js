@@ -614,7 +614,7 @@ function fireLightningFromOrb() {
 
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x151515); // 元の暗さに近い暗めの背景
+scene.background = new THREE.Color(0x000000); // 背景色を完全に黒に
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -766,10 +766,10 @@ cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切
 // document.body.appendChild(cameraInfo);
 
 // 光源の設定
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.15); // 環境光をもっと暗くして地面の過度な明るさを抑制
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // 環境光をほぼゼロに
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4); // 地面の明るさを更に抑制
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.08); // メイン光源を極限まで暗く
 directionalLight.position.set(5, 15, 7.5); // 高い位置に配置して影を長くする
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.width = 4096; // 影の解像度を向上
@@ -790,29 +790,37 @@ directionalLight.shadow.normalBias = 0.02;
 scene.add(directionalLight);
 
 // 戦士モデル専用のポイントライト - モデルの質感を引き立てる
-const warriorLight = new THREE.PointLight(0xffffff, 3.5, 12); // 騎士をより強く照らす
+const warriorLight = new THREE.PointLight(0xffffff, 0.1, 6); // 戦士用ライトを最小限に
 warriorLight.position.set(0, 2, 0);
 warriorLight.castShadow = true;
 scene.add(warriorLight);
 
 // 戦士モデル専用のスポットライト - 上から照らす
-const warriorSpotLight = new THREE.SpotLight(0xffffff, 2.5, 20, Math.PI / 4, 0.3, 1);
+const warriorSpotLight = new THREE.SpotLight(0xffffff, 0.1, 8, Math.PI / 4, 0.5, 1); // スポットライトを最小限に
 warriorSpotLight.position.set(0, 10, 0);
 warriorSpotLight.target.position.set(0, 0, 0);
 scene.add(warriorSpotLight);
 scene.add(warriorSpotLight.target);
 
 // 全体を照らす補助光（更に弱くして地面を暗く）
-const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.1);
+const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x000000, 0.05); // 半球ライトをほぼゼロに
 scene.add(hemisphereLight);
 
-// 騎士専用の明るいライト（常に追従）
-const knightLight = new THREE.PointLight(0xffffff, 4.0, 10);
+// 騎士専用の追加ライト（鎧を明るく照らす）
+const knightLight = new THREE.PointLight(0xffffff, 0.15, 5); // 騎士専用ライトを最小限に
 knightLight.position.set(0, 5, 2);
 scene.add(knightLight);
 
-// 環境マップは明るさ増加の原因になるため無効化（元の暗さを維持）
-scene.environment = null;
+// 環境マップの設定（金属の反射に使用）
+try {
+    // console.log("環境マップの読み込みを試みます...");
+    // 環境マップのファイルが存在しない可能性があるため、すぐに代替手段を使用
+    createDefaultEnvMap(scene, renderer);
+} catch (e) {
+    // console.error("環境マップの設定中にエラーが発生しました:", e);
+    // エラー時も代替手段を使用
+    createDefaultEnvMap(scene, renderer);
+}
 
 // チャンクマネージャークラス（openworldプロジェクトを参考に実装）
 class ChunkManager {
@@ -859,7 +867,7 @@ class ChunkManager {
         // マテリアルの作成
         const material = new THREE.MeshStandardMaterial({
             map: this.groundTexture,
-            color: 0x888888,  // 暗めに抑える
+            color: 0x111111,  // 地面の色を極限まで暗く
             roughness: 1.0,
             metalness: 0.0,
             emissive: new THREE.Color(0x000000) // 発光なし
@@ -1152,9 +1160,9 @@ if (assetLoader) {
                                 
                                 // 銀色の質感を強制的に設定
                                 // newMat.color.setRGB(0.8, 0.8, 0.85); // 銀色
-                                newMat.metalness = 1.0; // 金属性を最大に
+                                newMat.metalness = 1.0; // 金属性を控えめに
                                 newMat.roughness = 0.1; // 表面の粗さを最小に（光沢感を最大に）
-                                newMat.envMapIntensity = 2.0; // 環境マップの強度を上げる
+                                newMat.envMapIntensity = 0.8; // 環境マップの強度
                                 newMat.reflectivity = 1.0; // 反射率を最大に
                                 newMat.clearcoat = 0.5; // クリアコートを追加（光沢感を増す）
                                 newMat.clearcoatRoughness = 0.1; // クリアコートの粗さを低く
@@ -1174,9 +1182,9 @@ if (assetLoader) {
                             
                             // 銀色の質感を強制的に設定
                             // newMat.color.setRGB(0.9, 0.9, 0.95); // 明るい銀色
-                            newMat.metalness = 1.0; // 金属性を最大に
+                            newMat.metalness = 1.0; // 金属性を控えめに
                             newMat.roughness = 0.1; // 表面の粗さを最小に（光沢感を最大に）
-                            newMat.envMapIntensity = 2.0; // 環境マップの強度を上げる
+                            newMat.envMapIntensity = 0.8; // 環境マップの強度を下げる
                             newMat.reflectivity = 1.0; // 反射率を最大に
                             newMat.clearcoat = 0.5; // クリアコートを追加（光沢感を増す）
                             newMat.clearcoatRoughness = 0.1; // クリアコートの粗さを低く
@@ -1248,9 +1256,9 @@ if (assetLoader) {
                                         if (child.material.color) newMat.color.copy(child.material.color);
                                         
                                         // 銀色の質感を設定
-                                        newMat.metalness = 1.0;
+                                        newMat.metalness = 0.7;
                                         newMat.roughness = 0.1;
-                                        newMat.envMapIntensity = 2.0;
+                                        newMat.envMapIntensity = 0.3;
                                         newMat.reflectivity = 1.0;
                                         newMat.clearcoat = 0.5;
                                         newMat.clearcoatRoughness = 0.1;
@@ -1354,9 +1362,9 @@ if (assetLoader) {
                                     if (child.material.normalMap) newMat.normalMap = child.material.normalMap;
                                     if (child.material.color) newMat.color.copy(child.material.color);
                                     
-                                    newMat.metalness = 1.0;
+                                    newMat.metalness = 0.7;
                                     newMat.roughness = 0.1;
-                                    newMat.envMapIntensity = 2.0;
+                                    newMat.envMapIntensity = 0.3;
                                     newMat.reflectivity = 1.0;
                                     newMat.clearcoat = 0.5;
                                     newMat.clearcoatRoughness = 0.1;
@@ -2852,9 +2860,9 @@ function animate() {
         
         // 騎士専用ライトを追従
         knightLight.position.set(
-            gameState.playerPosition.x + 2,
+            gameState.playerPosition.x,
             gameState.playerPosition.y + 5,
-            gameState.playerPosition.z + 2
+            gameState.playerPosition.z
         );
     }
 
