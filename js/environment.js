@@ -15,9 +15,13 @@ export function getAssetPath(relativePath) {
 
     try {
         // モジュールが配信されているオリジンを最優先（Netlifyから環境を配信する構成のため）
-        const moduleOrigin = (typeof import.meta !== 'undefined' && import.meta.url)
-            ? new URL(import.meta.url).origin
-            : (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+        let moduleOrigin = '';
+        try {
+            moduleOrigin = import.meta.url ? new URL(import.meta.url).origin : '';
+        } catch (e) {
+            // import.metaが利用できない環境では window.location を使用
+            moduleOrigin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
+        }
         const base = (moduleOrigin ? moduleOrigin : '') + '/';
         const sanitized = relativePath.replace(/^\/+/, '');
         return new URL(sanitized, base).toString();
