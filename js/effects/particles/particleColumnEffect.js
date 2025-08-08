@@ -74,11 +74,35 @@ function createMagicCircleTexture() {
  */
 export function createParticleColumn(gameState, scene) {
     // ランダムな位置に配置
-    const columnOrigin = new THREE.Vector3(
-        (Math.random() - 0.5) * 60, // -30 to 30の範囲
-        gameState.groundLevel,
-        (Math.random() - 0.5) * 60  // -30 to 30の範囲
-    );
+    const px = gameState.playerPosition ? gameState.playerPosition.x : 0;
+    const pz = gameState.playerPosition ? gameState.playerPosition.z : 0;
+    const columnX = px + (Math.random() - 0.5) * 30;
+    const columnZ = pz + (Math.random() - 0.5) * 30;
+    const terrainY = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(columnX, columnZ) : 0;
+    const baseY = -5.0 + terrainY;
+    // 斜面かどうかを簡易判定（周囲4点の高さ差で閾値以上なら再配置）
+    function isFlat(x, z) {
+        if (!gameState.chunkManager) return true;
+        const s = 1.5;
+        const h0 = gameState.chunkManager.getHeightAtPosition(x, z);
+        const h1 = gameState.chunkManager.getHeightAtPosition(x + s, z);
+        const h2 = gameState.chunkManager.getHeightAtPosition(x - s, z);
+        const h3 = gameState.chunkManager.getHeightAtPosition(x, z + s);
+        const h4 = gameState.chunkManager.getHeightAtPosition(x, z - s);
+        const maxDiff = Math.max(
+            Math.abs(h1 - h0), Math.abs(h2 - h0), Math.abs(h3 - h0), Math.abs(h4 - h0)
+        );
+        return maxDiff < 0.5; // 平坦判定閾値
+    }
+
+    let safeX = columnX, safeZ = columnZ, tries = 0;
+    while (!isFlat(safeX, safeZ) && tries < 10) {
+        safeX = px + (Math.random() - 0.5) * 40;
+        safeZ = pz + (Math.random() - 0.5) * 40;
+        tries++;
+    }
+    const safeY = -5.0 + (gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(safeX, safeZ) : 0);
+    const columnOrigin = new THREE.Vector3(safeX, safeY + (gameState.playerPosition ? (gameState.playerPosition.y - safeY) * 0.5 : 0.0), safeZ);
     
     // 魔法陣を生成
     const magicCircleTexture = createMagicCircleTexture();
@@ -92,8 +116,7 @@ export function createParticleColumn(gameState, scene) {
     });
     
     const magicCircle = new THREE.Mesh(magicCircleGeometry, magicCircleMaterial);
-    magicCircle.position.copy(columnOrigin);
-    magicCircle.position.y += 0.1; // 地面からわずかに浮かせる
+    magicCircle.position.set(safeX, safeY + 0.3, safeZ); // 地面に極めて近く配置
     magicCircle.rotation.x = -Math.PI / 2; // 地面に平行に
     scene.add(magicCircle);
     

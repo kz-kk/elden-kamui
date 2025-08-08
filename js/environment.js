@@ -32,8 +32,8 @@ export function getAssetPath(relativePath) {
 }
 import { PMREMGenerator } from 'three';
 
-// 草を生やす関数
-export function addGrass(scene, gameState) {
+// 草機能は削除済み
+/* export function addGrass(scene, gameState) {
     // 草の数と配置範囲（メモリ最適化のため大幅に削減）
     const grassCount = 600; // 草の数を大幅に増やす（サイズを小さくして軽量化）
     const areaSize = 30;
@@ -402,12 +402,13 @@ export function addGrass(scene, gameState) {
         }
     }
 }
+*/
 
 // 岩を配置する関数
 export function addRocks(scene, gameState) {
     // 岩の数と配置範囲
-    const rockCount = 70; // 岩の数を適度に減らす
-    const areaSize = 45; // 配置範囲を広げる
+    const rockCount = 35; // 少し減らす
+    const areaSize = 65; // 配置範囲を広げる
     
     // console.log("岩のモデル読み込みを開始します...");
     
@@ -422,6 +423,9 @@ export function addRocks(scene, gameState) {
             
             // 読み込んだモデルをテンプレートとして使用
             const rockTemplate = gltf.scene;
+            // テンプレートのボトムYを事前計算（原点から底面までの距離）
+            const templateBox = new THREE.Box3().setFromObject(rockTemplate);
+            const templateMinY = templateBox.min.y; // 注意: 多くの場合負の値
             
             // マテリアルを暗く調整する
             rockTemplate.traverse((child) => {
@@ -495,13 +499,11 @@ export function addRocks(scene, gameState) {
                     // 10%の確率で大きな岩を生成
                     if (Math.random() < 0.1) {
                         sizeScale = 4.0 + Math.random() * 2.0; // 4.0〜6.0の大型岩
-                        // console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
-                        // console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
                     } else {
                         sizeScale = 1.5 + Math.random() * 2.0; // 1.5〜3.5の通常岩
                     }
                     rock.scale.set(sizeScale, sizeScale, sizeScale);
-                    
+
                     // ランダムな位置を決定
                     let x, z;
                     
@@ -529,22 +531,23 @@ export function addRocks(scene, gameState) {
                         z = Math.random() * areaSize * 2 - areaSize;
                     }
                     
+                    // 先に回転を決めてから底面で接地調整する
+                    rock.rotation.y = Math.random() * Math.PI * 2;
+                    rock.rotation.x = (Math.random() - 0.5) * 0.25; // 傾き少し弱め
+                    rock.rotation.z = (Math.random() - 0.5) * 0.25;
+
+                    // 回転・スケール反映後のボックスを計算（位置は原点のまま）
+                    const tempBox = new THREE.Box3().setFromObject(rock);
+                    const minYAfterTransform = tempBox.min.y;
+
                     // 地形の高さを取得して岩を適切に配置
                     const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : 0;
-                    // 地面との関係を調整（サイズに応じて一部埋める）
-                    const embeddedDepth = 0.1 + Math.random() * 0.5; // 埋め込み率（10%〜60%）に拡大
-                    const adjustedHeight = sizeScale * embeddedDepth; // サイズに比例して埋める
-                    // 地形の高さ（基準レベルからの相対高度）から埋め込み分を引く
-                    const y = terrainHeight - adjustedHeight + (Math.random() * 0.1);
-                    
+                    // 少しだけ埋めて浮き防止（傾き考慮）
+                    const embedOffset = 0.2 + Math.random() * 0.3 + sizeScale * 0.01; // 0.25〜0.5m相当 + サイズ連動
+                    const y = (-5.0 + terrainHeight) - minYAfterTransform - embedOffset;
+
                     // 位置を設定
                     rock.position.set(x, y, z);
-                    
-                    // ランダムな回転を与える
-                    rock.rotation.y = Math.random() * Math.PI * 2;
-                    // わずかに傾ける（より自然な配置に見せる）
-                    rock.rotation.x = (Math.random() - 0.5) * 0.3; // 傾きを強く
-                    rock.rotation.z = (Math.random() - 0.5) * 0.3;
                     
                     // シーンに追加
                     scene.add(rock);
@@ -586,6 +589,9 @@ export function addRocks(scene, gameState) {
                     // console.log("代替パスから岩のモデル読み込み成功");
                     // 読み込んだモデルをテンプレートとして使用
                     const rockTemplate = gltf.scene;
+                    // テンプレートのボトムYを事前計算
+                    const templateBox = new THREE.Box3().setFromObject(rockTemplate);
+                    const templateMinY = templateBox.min.y;
                     
                     // マテリアルを暗く調整する
                     rockTemplate.traverse((child) => {
@@ -692,22 +698,22 @@ export function addRocks(scene, gameState) {
                                 z = Math.random() * areaSize * 2 - areaSize;
                             }
                             
+                            // 先に回転を決めてから底面で接地調整する
+                            rock.rotation.y = Math.random() * Math.PI * 2;
+                            rock.rotation.x = (Math.random() - 0.5) * 0.25;
+                            rock.rotation.z = (Math.random() - 0.5) * 0.25;
+
+                            // 回転・スケール反映後のボックスを計算
+                            const tempBox = new THREE.Box3().setFromObject(rock);
+                            const minYAfterTransform = tempBox.min.y;
+
                             // 地形の高さを取得して岩を適切に配置
                             const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : 0;
-                            // 地面との関係を調整（サイズに応じて一部埋める）
-                            const embeddedDepth = 0.1 + Math.random() * 0.5; // 埋め込み率（10%〜60%）に拡大
-                            const adjustedHeight = sizeScale * embeddedDepth; // サイズに比例して埋める
-                            // 地形の高さ（基準レベルからの相対高度）から埋め込み分を引く
-                            const y = terrainHeight - adjustedHeight + (Math.random() * 0.1);
-                            
+                            const embedOffset = 0.2 + Math.random() * 0.3 + sizeScale * 0.05;
+                            const y = (-5.0 + terrainHeight) - minYAfterTransform - embedOffset;
+
                             // 位置を設定
                             rock.position.set(x, y, z);
-                            
-                            // ランダムな回転を与える
-                            rock.rotation.y = Math.random() * Math.PI * 2;
-                            // わずかに傾ける（より自然な配置に見せる）
-                            rock.rotation.x = (Math.random() - 0.5) * 0.3; // 傾きを強く
-                            rock.rotation.z = (Math.random() - 0.5) * 0.3;
                             
                             // シーンに追加
                             scene.add(rock);
@@ -742,7 +748,7 @@ export function addRocks(scene, gameState) {
 }
 
 // 草の揺れを更新する関数
-export function updateGrassWind(gameState) {
+/* export function updateGrassWind(gameState) {
     // パフォーマンス向上のため、15フレームに1回だけ更新（さらに軽量化）
     if (!gameState.grassUpdateCounter) gameState.grassUpdateCounter = 0;
     gameState.grassUpdateCounter++;
@@ -816,6 +822,7 @@ export function updateGrassWind(gameState) {
         }
     }
 }
+*/
 
 /**
  * 代替の環境マップを生成する関数

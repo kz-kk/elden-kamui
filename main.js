@@ -6,8 +6,9 @@ import { AudioListener, Audio, AudioLoader } from 'three';
 import { PMREMGenerator, CubeTextureLoader } from 'three';
 
 // 環境関連のインポート
-import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap, getAssetPath } from './js/environment.js';
-import { createGrassField } from './js/GrassField.js';
+import { addRocks, createDefaultEnvMap, getAssetPath } from './js/environment.js';
+import { initDebugUI, debugLog } from './js/debug.js';
+
 import { createTerrainMesh } from './js/terrain.js';
 
 // アニメーション関連のインポート
@@ -22,7 +23,8 @@ const ASSETS = {
         'player_wait': 'assets/knight/wait.glb',
         'player_run': 'assets/knight/run.glb', 
         'player_rolling': 'assets/knight/rolling.glb',
-        'dragon_fly': 'assets/dragon/fly.glb'
+        'dragon_fly': 'assets/dragon/fly.glb',
+        'castle': 'assets/area/shiro.glb'
     },
     // 音声ファイル
     sounds: {
@@ -196,6 +198,7 @@ const gameState = {
     playerRotationSpeed: 0.05,
     playerModel: null,
     dragonModel: null,
+    castleModel: null,
     isLoading: true,
     gameStarted: false,
     videoPlaying: false,
@@ -230,6 +233,9 @@ const gameState = {
     windFrequency: 0.5, // 風の周期
     useShaderGrass: true, // シェーダーベースの草を使用するかどうか
     grassShaderMaterial: null, // 草のシェーダーマテリアル
+    // 樹木の風揺れ用
+    treeWindMaterials: [],
+    treeWindBaseAmp: 0.5,
     
     // プレイヤーの体力関連
     playerHealth: 100, // 最大体力
@@ -612,6 +618,9 @@ function fireLightningFromOrb() {
     gameState.lightningOrbTimer = 0;
 }
 
+// デバッグUI
+try { initDebugUI(); debugLog('debug overlay ready'); } catch (_) {}
+
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // 背景色を完全に黒に
@@ -838,6 +847,144 @@ class ChunkManager {
         this.groundTexture.wrapS = THREE.RepeatWrapping;
         this.groundTexture.wrapT = THREE.RepeatWrapping;
         this.groundTexture.repeat.set(10, 10);
+
+        // チャンク内に配置する木（オーク）の設定
+        this.minTreesPerChunk = 60; // ランダム最小数（密度アップ）
+        this.maxTreesPerChunk = 80; // ランダム最大数（密度アップ）
+        this.treeTemplate = null;  // GLBテンプレート
+        this.treeLoader = new GLTFLoader();
+        this.treeModelUrl = getAssetPath('assets/area/oak_tree_3D.glb');
+
+        // 木モデルを一度だけロード
+        try {
+            this.treeLoader.load(
+                this.treeModelUrl,
+                (gltf) => {
+                    this.treeTemplate = gltf.scene;
+
+                    // マテリアルと影の調整（暗い環境に合わせる）
+                    this.treeTemplate.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                const applyTweaks = (mat) => {
+                                    const newMat = mat.clone();
+                                    // PBR調整（暗所でも黒潰れしにくく）
+                                    newMat.metalness = 0.0;
+                                    newMat.roughness = 0.95;
+                                    newMat.envMapIntensity = 0.1;
+                                    if (newMat.color) {
+                                        newMat.color.multiplyScalar(0.85);
+                                    }
+                                    if ('emissive' in newMat) {
+                                        newMat.emissive = new THREE.Color(0x0a0a0a);
+                                        if ('emissiveIntensity' in newMat) newMat.emissiveIntensity = 0.08;
+                                    }
+                                    // 葉の両面表示にして真っ黒を回避（裏面が見える場合）
+                                    newMat.side = THREE.DoubleSide;
+                                    // テクスチャ色空間を安全に設定
+                                    if (newMat.map) {
+                                        if ('encoding' in newMat.map) newMat.map.encoding = THREE.sRGBEncoding;
+                                        if ('colorSpace' in newMat.map && THREE.SRGBColorSpace) newMat.map.colorSpace = THREE.SRGBColorSpace;
+                                        newMat.map.needsUpdate = true;
+                                    }
+                                    newMat.needsUpdate = true;
+                                    return newMat;
+                                };
+                                if (Array.isArray(child.material)) {
+                                    child.material = child.material.map(applyTweaks);
+                                } else {
+                                    child.material = applyTweaks(child.material);
+                                }
+                            }
+                        }
+                    });
+
+                    // 既存のチャンクにも木を配置
+                    for (const [key, chunkGroup] of this.chunks) {
+                        if (!chunkGroup || !chunkGroup.userData) continue;
+                        const { chunkX, chunkZ } = chunkGroup.userData;
+                        if (typeof chunkX === 'number' && typeof chunkZ === 'number') {
+                            this.populateTreesInChunk(chunkGroup, chunkX, chunkZ);
+                        }
+                    }
+                },
+                undefined,
+                (err) => {
+                    console.error('木モデルの読み込みに失敗:', err);
+                }
+            );
+        } catch (e) {
+            console.error('木モデル読み込み例外:', e);
+        }
+
+        // 大型の石山（マウンテン）配置設定
+        this.minMountainsPerChunk = 0; // デフォルトは少なめ
+        this.maxMountainsPerChunk = 2; // 0〜2個ランダム
+        this.mountainTemplates = [];   // 複数テンプレート
+        this.mountainLoader = new GLTFLoader();
+        this.mountainModelUrls = [
+            getAssetPath('assets/area/stone_mountain1.glb'),
+            getAssetPath('assets/area/stone_mountain2.glb')
+        ];
+        // ロードしてPBR化
+        const toPhysicalMaterial = (srcMat) => {
+            const pm = new THREE.MeshPhysicalMaterial();
+            if (srcMat.map) {
+                pm.map = srcMat.map;
+                if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
+                if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
+                pm.map.needsUpdate = true;
+            }
+            if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
+            if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
+            if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
+            if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
+            if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
+            if (srcMat.color) pm.color.copy(srcMat.color);
+            pm.metalness = 0.0;
+            pm.roughness = 0.95;
+            pm.envMapIntensity = 0.3;
+            pm.side = THREE.FrontSide;
+            pm.needsUpdate = true;
+            return pm;
+        };
+        const onMountainLoaded = (gltf) => {
+            const tpl = gltf.scene;
+            tpl.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material = child.material.map(toPhysicalMaterial);
+                        } else {
+                            child.material = toPhysicalMaterial(child.material);
+                        }
+                    }
+                }
+            });
+            this.mountainTemplates.push(tpl);
+            // 既存チャンクにも山を適用
+            for (const [key, chunkGroup] of this.chunks) {
+                if (!chunkGroup || !chunkGroup.userData) continue;
+                const { chunkX, chunkZ } = chunkGroup.userData;
+                if (typeof chunkX === 'number' && typeof chunkZ === 'number') {
+                    this.populateMountainsInChunk(chunkGroup, chunkX, chunkZ);
+                }
+            }
+        };
+        // 2モデルを非同期ロード
+        this.mountainModelUrls.forEach((url) => {
+            try {
+                this.mountainLoader.load(url, onMountainLoaded, undefined, (err) => {
+                    console.error('山モデルの読み込みに失敗:', url, err);
+                });
+            } catch (e) {
+                console.error('山モデル読み込み例外:', url, e);
+            }
+        });
     }
     
     getChunkKey(x, z) {
@@ -867,7 +1014,7 @@ class ChunkManager {
         if (!this.sharedMaterial) {
             this.sharedMaterial = new THREE.MeshStandardMaterial({
                 map: this.groundTexture,
-                color: 0x111111,  // 地面の色を極限まで暗く
+                color: 0x1a1a1a,  // やや暗めへ戻す
                 roughness: 1.0,
                 metalness: 0.0,
                 emissive: new THREE.Color(0x000000) // 発光なし
@@ -891,7 +1038,7 @@ class ChunkManager {
             const worldZ = worldOffsetZ + this.chunkSize / 2 - localZ;
             
             // 地形の高さを取得
-            const height = this.getHeightAtPosition(worldX, worldZ);
+                const height = this.getHeightAtPosition(worldX, worldZ);
             
             // 高さを設定
             vertices[i + 2] = height;
@@ -918,49 +1065,206 @@ class ChunkManager {
         chunk.castShadow = true;
         chunk.receiveShadow = true;
         
-        // チャンクに草フィールドを追加
-        let chunkGrassField = null;
-        try {
-            const { mesh, update } = createGrassField({
-                count: 15000,  // チャンクサイズに応じて調整
-                areaSize: this.chunkSize * 0.8, // チャンクサイズの80%に配置
-                bladeWidth: 0.12,
-                bladeHeight: 0.5,
-                alphaTest: 0.6,
-                textureUrl: getAssetPath('assets/images/grass_blade.png'),
-                swayAmplitude: 0.06,
-                castShadow: false,
-                heightAt: (x, z) => {
-                    // ローカル座標をワールド座標に変換
-                    const worldX = worldOffsetX + this.chunkSize / 2 + x;
-                    const worldZ = worldOffsetZ + this.chunkSize / 2 - z;
-                    return this.getHeightAtPosition(worldX, worldZ);
-                },
-                baseY: -5.0
-            });
-            
-            // 草フィールドの位置を設定
-            mesh.position.set(
-                worldOffsetX + this.chunkSize / 2,
-                -5.0,
-                worldOffsetZ + this.chunkSize / 2
-            );
-            
-            chunkGrassField = { mesh, update };
-            scene.add(mesh);
-        } catch (e) {
-            console.warn('チャンクの草フィールド初期化に失敗:', e);
-        }
-        
-        // チャンクと草フィールドをグループ化
+        // チャンクをグループ化
         const chunkGroup = new THREE.Group();
         chunkGroup.add(chunk);
-        if (chunkGrassField) {
-            // 草フィールドの更新関数を保存
-            chunkGroup.userData = { grassField: chunkGrassField };
+        // userData 初期化（木・山・チャンク座標）
+        chunkGroup.userData = {
+            trees: [],
+            mountains: [],
+            chunkX,
+            chunkZ,
+        };
+
+        // 木（オーク）をこのチャンクに配置（テンプレートが読み込み済みなら）
+        if (this.treeTemplate) {
+            this.populateTreesInChunk(chunkGroup, chunkX, chunkZ);
+        }
+        // 山（マウンテン）を配置（テンプレートが読み込み済みなら）
+        if (this.mountainTemplates && this.mountainTemplates.length > 0) {
+            this.populateMountainsInChunk(chunkGroup, chunkX, chunkZ);
         }
         
         return chunkGroup;
+    }
+
+    // チャンク内に木をランダム配置
+    populateTreesInChunk(chunkGroup, chunkX, chunkZ) {
+        try {
+            if (!this.treeTemplate || !chunkGroup || !chunkGroup.userData) return;
+
+            // 既に配置済みなら二重配置を避ける
+            if (Array.isArray(chunkGroup.userData.trees) && chunkGroup.userData.trees.length > 0) return;
+
+            const worldOffsetX = chunkX * this.chunkSize;
+            const worldOffsetZ = chunkZ * this.chunkSize;
+
+            // チャンク中央基準の安全ゾーン（端から少し内側）
+            const half = this.chunkSize / 2;
+            const margin = Math.max(5, this.chunkSize * 0.02); // 2%マージン（最小5m）
+            const minX = worldOffsetX + margin;
+            const maxX = worldOffsetX + this.chunkSize - margin;
+            const minZ = worldOffsetZ + margin;
+            const maxZ = worldOffsetZ + this.chunkSize - margin;
+
+            // 個数を決定
+            const minC = Math.max(0, Math.floor(this.minTreesPerChunk));
+            const maxC = Math.max(minC, Math.floor(this.maxTreesPerChunk));
+            const count = minC + Math.floor(Math.random() * (maxC - minC + 1));
+
+            for (let i = 0; i < count; i++) {
+                const tree = this.treeTemplate.clone(true);
+
+                // スケール（さらに大きく）
+                const scale = 8.0 + Math.random() * 6.0; // 8.0〜14.0
+                tree.scale.set(scale, scale, scale);
+
+                // 位置（チャンク内部のランダム点）
+                const worldX = minX + Math.random() * (maxX - minX);
+                const worldZ = minZ + Math.random() * (maxZ - minZ);
+                const terrainHeight = this.getHeightAtPosition(worldX, worldZ);
+
+                // 向き・傾き
+                tree.rotation.y = Math.random() * Math.PI * 2;
+                tree.rotation.x = (Math.random() - 0.5) * 0.05;
+                tree.rotation.z = (Math.random() - 0.5) * 0.05;
+
+                // 一度ワールド行列を更新してボックスを取得
+                tree.updateMatrixWorld(true);
+                const bbox = new THREE.Box3().setFromObject(tree);
+                const minYAfterTransform = bbox.min.y;
+
+                // 接地調整（地盤基準 -5.0 を考慮）
+                const baseY = -5.0 + terrainHeight;
+                const embedOffset = 0.05 + Math.random() * 0.1; // わずかに埋める
+                const finalY = baseY - minYAfterTransform - embedOffset;
+                tree.position.set(worldX, finalY, worldZ);
+
+                // 幹中心のみの非常に狭い衝突半径を登録（1本につき1つだけ）
+                if (!chunkGroup.userData.treeColliders) chunkGroup.userData.treeColliders = [];
+                const trunkRadius = 0.35; // 幹中心のみ
+                chunkGroup.userData.treeColliders.push({ position: new THREE.Vector3(worldX, baseY, worldZ), radius: trunkRadius });
+
+                // 位置確定後に再計算して、上部揺れ用の高さ範囲を取得
+                tree.updateMatrixWorld(true);
+                const worldBBox = new THREE.Box3().setFromObject(tree);
+                const uMinY = worldBBox.min.y;
+                const uMaxY = worldBBox.max.y;
+
+                // マテリアルに風揺れシェーダを注入（上部のみ）
+                const applyTreeWindToMaterial = (mat) => {
+                    const material = mat.clone();
+                    material.onBeforeCompile = (shader) => {
+                        const height = Math.max(uMaxY - uMinY, 0.0001);
+                        const ampWorld = Math.max(height * 0.02, 0.3) * (0.8 + Math.random() * 0.6) * gameState.treeWindBaseAmp; // スケール連動
+                        shader.uniforms.uTime = { value: 0 };
+                        shader.uniforms.uWind = { value: new THREE.Vector2(1.0, 0.35) };
+                        shader.uniforms.uAmp = { value: ampWorld };
+                        shader.uniforms.uMinY = { value: uMinY };
+                        shader.uniforms.uMaxY = { value: uMaxY };
+                        shader.uniforms.uFreq = { value: 0.8 + Math.random() * 0.6 };
+
+                        // worldPos を使って上部だけ揺らす
+                        shader.vertexShader = shader.vertexShader
+                            .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform vec2 uWind;\nuniform float uAmp;\nuniform float uMinY;\nuniform float uMaxY;\nuniform float uFreq;`)
+                            .replace('#include <begin_vertex>', `#include <begin_vertex>\n{
+    vec4 wp = modelMatrix * vec4(transformed, 1.0);
+    float tip = clamp((wp.y - uMinY) / max(uMaxY - uMinY, 0.0001), 0.0, 1.0);
+    // 2軸に少し位相差を付けて複合揺れ
+    float wpx = wp.x * 0.12; float wpz = wp.z * 0.15;
+    float s1 = sin(uTime * uFreq + wpx + wpz);
+    float s2 = cos(uTime * (uFreq*1.3) + wpx*0.7 - wpz*0.5);
+    float n = (s1 * 0.6 + s2 * 0.4);
+    vec2 dir = normalize(uWind);
+    transformed.x += dir.x * n * uAmp * tip;
+    transformed.z += dir.y * n * uAmp * tip;
+}`);
+
+                        material.userData.shader = shader;
+                    };
+                    material.needsUpdate = true;
+                    // 初期値を保存
+                    material.userData.treeWind = { uMinY, uMaxY };
+                    // 更新対象に登録
+                    gameState.treeWindMaterials.push(material);
+                    return material;
+                };
+
+                tree.traverse((child) => {
+                    if (child.isMesh) {
+                        if (Array.isArray(child.material)) {
+                            child.material = child.material.map(applyTreeWindToMaterial);
+                        } else if (child.material) {
+                            child.material = applyTreeWindToMaterial(child.material);
+                        }
+                    }
+                });
+
+                // グループにぶら下げて管理
+                chunkGroup.add(tree);
+                chunkGroup.userData.trees.push(tree);
+            }
+        } catch (e) {
+            console.warn('チャンクへの木配置に失敗:', e);
+        }
+    }
+
+    // チャンク内に大型の石山をランダム配置
+    populateMountainsInChunk(chunkGroup, chunkX, chunkZ) {
+        try {
+            if (!this.mountainTemplates || this.mountainTemplates.length === 0) return;
+            if (!chunkGroup || !chunkGroup.userData) return;
+            // 既に配置済みならスキップ（複数テンプレ読み込みの重複回避）
+            if (Array.isArray(chunkGroup.userData.mountains) && chunkGroup.userData.mountains.length > 0) return;
+
+            const worldOffsetX = chunkX * this.chunkSize;
+            const worldOffsetZ = chunkZ * this.chunkSize;
+            const margin = Math.max(20, this.chunkSize * 0.08); // 端から少し内側
+            const minX = worldOffsetX + margin;
+            const maxX = worldOffsetX + this.chunkSize - margin;
+            const minZ = worldOffsetZ + margin;
+            const maxZ = worldOffsetZ + this.chunkSize - margin;
+
+            const minC = Math.max(0, Math.floor(this.minMountainsPerChunk));
+            const maxC = Math.max(minC, Math.floor(this.maxMountainsPerChunk));
+            const count = minC + Math.floor(Math.random() * (maxC - minC + 1));
+
+            for (let i = 0; i < count; i++) {
+                // ランダムにテンプレート選択
+                const tpl = this.mountainTemplates[Math.floor(Math.random() * this.mountainTemplates.length)];
+                const mountain = tpl.clone(true);
+
+                // スケール（大きなサイズ）
+                const scale = 40 + Math.random() * 50; // 40〜90
+                mountain.scale.set(scale, scale, scale);
+
+                // 回転（自然なランダム）
+                mountain.rotation.y = Math.random() * Math.PI * 2;
+
+                // 位置（チャンク内部のランダム点）
+                const worldX = minX + Math.random() * (maxX - minX);
+                const worldZ = minZ + Math.random() * (maxZ - minZ);
+                const terrainHeight = this.getHeightAtPosition(worldX, worldZ);
+
+                // 原点でボックス算出して底面合わせ
+                mountain.updateMatrixWorld(true);
+                const bbox = new THREE.Box3().setFromObject(mountain);
+                const minY = bbox.min.y;
+                const baseY = -5.0 + terrainHeight;
+                const finalY = baseY - minY - (0.5 + Math.random() * 0.5); // 少し埋める
+                mountain.position.set(worldX, finalY, worldZ);
+
+                chunkGroup.add(mountain);
+                chunkGroup.userData.mountains.push(mountain);
+                // 簡易コライダを登録
+                if (!chunkGroup.userData.mountainColliders) chunkGroup.userData.mountainColliders = [];
+                const mbox = new THREE.Box3().setFromObject(mountain);
+                const mrad = mbox.getSize(new THREE.Vector3()).length() * 0.25;
+                chunkGroup.userData.mountainColliders.push({ position: new THREE.Vector3(worldX, finalY, worldZ), radius: mrad });
+            }
+        } catch (e) {
+            console.warn('チャンクへの山配置に失敗:', e);
+        }
     }
     
     updateChunks(playerPosition) {
@@ -987,7 +1291,7 @@ class ChunkManager {
                     const chunk = this.createChunk(chunkX, chunkZ);
                     this.chunks.set(key, chunk);
                     this.scene.add(chunk);
-                    console.log(`新しいチャンクを生成: ${key}`);
+                    // try { debugLog('chunk:create', { key, chunkX, chunkZ }); } catch (_) {}
                 }
             }
         }
@@ -1001,6 +1305,47 @@ class ChunkManager {
             
             // 削除距離を超えたチャンクのみ削除
             if (distance > this.deleteDistance) {
+                // 木（ツリー）の破棄・解放
+                if (chunkGroup.userData && Array.isArray(chunkGroup.userData.trees)) {
+                    for (const tree of chunkGroup.userData.trees) {
+                        try {
+                            if (tree && tree.parent) tree.parent.remove(tree);
+                            tree.traverse((obj) => {
+                                if (obj.isMesh) {
+                                    if (obj.geometry) obj.geometry.dispose();
+                                    if (obj.material) {
+                                        if (Array.isArray(obj.material)) {
+                                            obj.material.forEach((m) => m && m.dispose && m.dispose());
+                                        } else if (obj.material.dispose) {
+                                            obj.material.dispose();
+                                        }
+                                    }
+                                }
+                            });
+                        } catch (_) {}
+                    }
+                    chunkGroup.userData.trees = [];
+                }
+
+                // 山の破棄・解放
+                if (chunkGroup.userData && Array.isArray(chunkGroup.userData.mountains)) {
+                    for (const m of chunkGroup.userData.mountains) {
+                        try {
+                            if (m && m.parent) m.parent.remove(m);
+                            m.traverse((obj) => {
+                                if (obj.isMesh) {
+                                    if (obj.geometry) obj.geometry.dispose();
+                                    if (obj.material) {
+                                        if (Array.isArray(obj.material)) obj.material.forEach((mat) => mat && mat.dispose && mat.dispose());
+                                        else if (obj.material.dispose) obj.material.dispose();
+                                    }
+                                }
+                            });
+                        } catch (_) {}
+                    }
+                    chunkGroup.userData.mountains = [];
+                }
+
                 this.scene.remove(chunkGroup);
                 
                 // チャンクグループ内のすべての子オブジェクトを削除
@@ -1015,16 +1360,7 @@ class ChunkManager {
                     }
                 });
                 
-                // 草フィールドも削除
-                if (chunkGroup.userData && chunkGroup.userData.grassField) {
-                    this.scene.remove(chunkGroup.userData.grassField.mesh);
-                    if (chunkGroup.userData.grassField.mesh.geometry) {
-                        chunkGroup.userData.grassField.mesh.geometry.dispose();
-                    }
-                    if (chunkGroup.userData.grassField.mesh.material) {
-                        chunkGroup.userData.grassField.mesh.material.dispose();
-                    }
-                }
+
                 
                 this.chunks.delete(key);
                 console.log(`チャンクを削除: ${key} (距離: ${distance})`);
@@ -1152,15 +1488,10 @@ chunkManager.updateChunks(gameState.playerPosition);
 
 console.log("無限地形システムを再有効化しました");
 
-// 草を生やす関数（メモリ最適化済み）
-// TODO: チャンクごとに草を生成するように修正
-// addGrass(scene, gameState);
+// 草機能は削除済み
 
-// 中央の草フィールドは無効化（チャンクベースに移行）
-let grassField = null;
-
-// 岩の配置は無効化（チャンクベースに移行）
-// addRocks(scene, gameState);
+// 岩の配置
+addRocks(scene, gameState);
 
 // スカイボックスの作成
 const skyGeometry = new THREE.SphereGeometry(500, 60, 40);
@@ -1654,6 +1985,117 @@ if (assetLoader) {
             // (error) => {
             //     console.error('プレイヤージャンプモデル読み込みエラー:', error);
             // });
+
+            // 城（shiro.glb）の読み込み試行（ワールドに1つだけ大きく配置）
+            try {
+                assetLoader.loadModel('castle', (castleGltf) => {
+                    const castle = castleGltf.scene;
+                    // マテリアルをPBR（MeshPhysicalMaterial）に統一し、影を有効化
+                    castle.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                const toPhysical = (srcMat) => {
+                                    const pm = new THREE.MeshPhysicalMaterial();
+                                    if (srcMat.map) {
+                                        pm.map = srcMat.map;
+                                        if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
+                                        if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
+                                        pm.map.needsUpdate = true;
+                                    }
+                                    if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
+                                    if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
+                                    if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
+                                    if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
+                                    if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
+                                    if (srcMat.color) pm.color.copy(srcMat.color);
+                                    // 暗めにする
+                                    pm.color.multiplyScalar(0.65);
+                                    pm.metalness = 0.0;   // 石材想定
+                                    pm.roughness = 0.95;  // よりマットに
+                                    pm.envMapIntensity = 0.25; // 反射控えめ
+                                    pm.aoMapIntensity = 1.5;   // 汚れ/陰影を強調
+                                    pm.clearcoat = 0.0;
+                                    pm.side = THREE.FrontSide;
+                                    pm.needsUpdate = true;
+                                    // 簡易的な汚れ（グランジ）効果をシェーダで付与
+                                    pm.onBeforeCompile = (shader) => {
+                                        // グローバルに varying を宣言
+                                        shader.vertexShader = shader.vertexShader.replace(
+                                            '#include <common>',
+                                            `#include <common>\n\nvarying vec3 vWorldPos;\n`
+                                        );
+                                        // ワールド位置を記録（関数内は代入のみ）
+                                        shader.vertexShader = shader.vertexShader.replace(
+                                            '#include <worldpos_vertex>',
+                                            `#include <worldpos_vertex>\n\nvWorldPos = worldPosition.xyz;`
+                                        );
+                                        const dirtChunk = `
+// 2D noise based on world XZ
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); float a=hash(i); float b=hash(i+vec2(1.,0.)); float c=hash(i+vec2(0.,1.)); float d=hash(i+vec2(1.,1.)); vec2 u=f*f*(3.-2.*f); return mix(a,b,u.x) + (c-a)*u.y*(1.-u.x) + (d-b)*u.x*u.y; }
+varying vec3 vWorldPos;
+`; 
+                                        shader.fragmentShader = shader.fragmentShader
+                                            .replace('#include <common>', '#include <common>\n' + dirtChunk)
+                                            .replace(
+                                                '#include <output_fragment>',
+                                                `#include <output_fragment>\n{
+  // dirt mask: 大きめスケール+多重ノイズ
+  float n1 = noise(vWorldPos.xz * 0.02);
+  float n2 = noise(vWorldPos.xz * 0.08 + n1);
+  float dirt = smoothstep(0.55, 0.85, n1*0.6 + n2*0.4);
+  // 下向き法線ほど汚れを追加（近似: view space の法線Zで弱く調整）
+  float facing = saturate(dot(normalize(normal), vec3(0.0, 0.0, 1.0)));
+  float dirtIntensity = mix(0.2, 0.5, 1.0 - facing);
+  vec3 dirtColor = vec3(1.0 - dirt * dirtIntensity);
+  gl_FragColor.rgb *= dirtColor;
+}`
+                                            );
+                                    };
+                                    return pm;
+                                };
+                                if (Array.isArray(child.material)) {
+                                    child.material = child.material.map(toPhysical);
+                                } else {
+                                    child.material = toPhysical(child.material);
+                                }
+                            }
+                        }
+                    });
+
+                    // 配置場所：初期キャラのそば（前方斜め）
+                    const baseX = gameState.playerPosition ? gameState.playerPosition.x : 0;
+                    const baseZ = gameState.playerPosition ? gameState.playerPosition.z : 0;
+                    const targetX = baseX + 30; // 30m横
+                    const targetZ = baseZ + 40; // 40m前
+                    const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
+
+                    // スケール（近景でも大きく見せる）
+                    const scale = 25; 
+                    castle.scale.set(scale, scale, scale);
+
+                    // ボックスで底面合わせ
+                    castle.updateMatrixWorld(true);
+                    const bbox = new THREE.Box3().setFromObject(castle);
+                    const minY = bbox.min.y;
+                    const baseY = -5.0 + h;
+                    const finalY = baseY - minY - 0.5; // わずかに埋める
+                    castle.position.set(targetX, finalY, targetZ);
+
+                    // シーンに追加し保存
+                    scene.add(castle);
+                    gameState.castleModel = castle;
+                // 簡易衝突用に登録
+                if (!gameState.staticColliders) gameState.staticColliders = [];
+                const cbox2 = new THREE.Box3().setFromObject(castle);
+                const rad2 = cbox2.getSize(new THREE.Vector3()).length() * 0.25;
+                gameState.staticColliders.push({ position: new THREE.Vector3(targetX, finalY, targetZ), radius: rad2 });
+                });
+            } catch (e) {
+                console.error('城モデル読み込み例外:', e);
+            }
 
             // ドラゴンモデルの読み込み試行
             try {
@@ -2775,19 +3217,28 @@ function animate() {
     updateAllEffects(gameState, scene);
 
     // 中央の草フィールドの更新（風アニメーション）
-    if (grassField && typeof grassField.update === 'function') {
-        grassField.update(clock.elapsedTime);
-    }
+
     
     // 全チャンクの草フィールドを更新（風アニメーション）
     if (gameState.chunkManager && gameState.chunkManager.chunks) {
         gameState.chunkManager.chunks.forEach((chunkGroup) => {
-            if (chunkGroup.userData && chunkGroup.userData.grassField && 
-                typeof chunkGroup.userData.grassField.update === 'function') {
-                chunkGroup.userData.grassField.update(clock.elapsedTime);
-            }
+
         });
     }
+
+        // 樹木の風揺れ（上部のみ）時間更新
+        if (gameState.treeWindMaterials && gameState.treeWindMaterials.length) {
+            const t = performance.now() * 0.001; // より大きく進む時間
+            const windStrength = 1.5 + gameState.windStrength * 1.2;
+            const windVec = new THREE.Vector2(Math.sin(t * 0.2), Math.cos(t * 0.17)).normalize().multiplyScalar(windStrength);
+            for (const mat of gameState.treeWindMaterials) {
+                const sh = mat.userData && mat.userData.shader ? mat.userData.shader : null;
+                if (sh && sh.uniforms) {
+                    if (sh.uniforms.uTime) sh.uniforms.uTime.value = t * 1.6; // 進行を加速
+                    if (sh.uniforms.uWind) sh.uniforms.uWind.value.copy(windVec);
+                }
+            }
+        }
 
     // クールダウンタイマーの更新
     if (gameState.rollingCooldown > 0) gameState.rollingCooldown--;

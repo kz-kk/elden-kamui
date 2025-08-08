@@ -96,6 +96,39 @@ export function checkCollisions(gameState, isRollingAnimationPlaying) {
             gameState.verticalVelocity = 0; // 初速度はゼロから
         }
     }
+
+    // プレイヤーと静的コライダ（城・木・山など）の衝突
+    if (gameState.playerModel) {
+        const colliders = [];
+        // 既存の静的コライダ配列
+        if (gameState.staticColliders && Array.isArray(gameState.staticColliders)) {
+            colliders.push(...gameState.staticColliders);
+        }
+        // チャンク内ツリーの簡易コライダ
+        if (gameState.chunkManager && gameState.chunkManager.chunks) {
+            gameState.chunkManager.chunks.forEach((chunkGroup) => {
+                if (chunkGroup.userData && Array.isArray(chunkGroup.userData.treeColliders)) {
+                    colliders.push(...chunkGroup.userData.treeColliders);
+                }
+                if (chunkGroup.userData && Array.isArray(chunkGroup.userData.mountainColliders)) {
+                    colliders.push(...chunkGroup.userData.mountainColliders);
+                }
+            });
+        }
+        // 判定
+        for (const c of colliders) {
+            if (!c || !c.position || typeof c.radius !== 'number') continue;
+            const dx = playerPos.x - c.position.x;
+            const dz = playerPos.z - c.position.z;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+            if (dist < (c.radius + playerRadius)) {
+                const push = new THREE.Vector3(dx, 0, dz).normalize();
+                const overlap = (c.radius + playerRadius) - dist;
+                gameState.playerPosition.x += push.x * overlap * 0.6;
+                gameState.playerPosition.z += push.z * overlap * 0.6;
+            }
+        }
+    }
     
     // プレイヤーとドラゴンの衝突判定
     if (gameState.playerModel && gameState.dragonModel && !gameState.isDragonDefeated) {

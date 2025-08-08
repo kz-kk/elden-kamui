@@ -157,14 +157,22 @@ export function restartGame(gameState, scene) {
     }
     gameState.yellowParticleEffects = [];
     
-    // パーティクル柱エフェクトをすべて削除
-    for (let i = gameState.particleColumnEffects.length - 1; i >= 0; i--) {
-        const column = gameState.particleColumnEffects[i];
-        scene.remove(column.particles);
-        scene.remove(column.magicCircle);
-        column.geometry.dispose();
-        column.material.dispose();
-        column.magicCircleMaterial.dispose();
+    // パーティクル柱エフェクトを安全に削除
+    if (gameState.particleColumnEffects && gameState.particleColumnEffects.length) {
+        for (let i = gameState.particleColumnEffects.length - 1; i >= 0; i--) {
+            const column = gameState.particleColumnEffects[i];
+            if (!column) continue;
+            try {
+                if (column.particles) scene.remove(column.particles);
+                if (column.magicCircle) scene.remove(column.magicCircle);
+                if (column.geometry && column.geometry.dispose) column.geometry.dispose();
+                if (column.material && column.material.dispose) column.material.dispose();
+                if (column.magicCircle && column.magicCircle.geometry && column.magicCircle.geometry.dispose) column.magicCircle.geometry.dispose();
+                if (column.magicCircle && column.magicCircle.material && column.magicCircle.material.dispose) column.magicCircle.material.dispose();
+            } catch (e) {
+                console.warn('columnEffect dispose 中にエラー:', e);
+            }
+        }
     }
     gameState.particleColumnEffects = [];
     

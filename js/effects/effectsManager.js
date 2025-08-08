@@ -4,7 +4,7 @@
  */
 import { updateFogEffects } from './fogEffect.js';
 import { updateDragonFlameEffects, updateBeamEffects } from './particles/index.js';
-import { updateGrassWind } from '../environment.js';
+// import { updateGrassWind } from '../environment.js';
 import { createParticleColumn } from './particles/particleColumnEffect.js';
 
 /**
@@ -28,8 +28,7 @@ export function updateAllEffects(gameState, scene) {
         gameState.dustSpawnTimer--;
     }
     
-    // 草の揺れを更新
-    updateGrassWind(gameState);
+    // 草機能は削除済み
     
     // 各炎エフェクトを更新
     for (let i = gameState.flameEffects.length - 1; i >= 0; i--) {

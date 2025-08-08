@@ -9,6 +9,8 @@
 
 import * as THREE from 'three';
 
+// NOTE: 色関連の前処理は行わない（ユーザー要望により無効化）
+
 export function createGrassField(opts = {}) {
   const {
     count = 60000,
@@ -16,7 +18,7 @@ export function createGrassField(opts = {}) {
     bladeWidth = 0.10,
     bladeHeight = 0.6,
     alphaTest = 0.5,
-    textureUrl = 'grass_blade.png',
+    textureUrl = 'grass_blade_dense.png',
     wind = new THREE.Vector2(1.0, 0.35),
     noiseScale = 0.5,
     swayAmplitude = 0.09,
@@ -37,21 +39,27 @@ export function createGrassField(opts = {}) {
   map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
   map.anisotropy = 8;
   map.encoding = THREE.sRGBEncoding;
+  if ('colorSpace' in map && THREE.SRGBColorSpace) map.colorSpace = THREE.SRGBColorSpace;
 
   const mat = new THREE.MeshStandardMaterial({
     map,
-    alphaTest,
+    alphaTest: Math.max(0.7, alphaTest),
     transparent: false,
     side: THREE.DoubleSide,
     roughness: 1.0,
     metalness: 0.0,
-    color: new THREE.Color(0x2a3520),
+    color: new THREE.Color(0xffffff),
     emissive: new THREE.Color(0x000000),
     depthWrite: true,
     depthTest: true,
   });
+  mat.envMapIntensity = 0.25;
+  // 色関連のエフェクトは無効化
 
   mat.onBeforeCompile = (shader) => {
+    // PNGにアルファが無い場合でも緑チャンネルをキーに透過扱い
+    shader.uniforms.uCutLow = { value: 0.2 };   // しきい値開始（緑）
+    shader.uniforms.uCutHigh = { value: 0.4 };  // しきい値終了
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uWind = { value: wind };
     shader.uniforms.uNoiseScale = { value: noiseScale };
@@ -90,6 +98,25 @@ export function createGrassField(opts = {}) {
 
         transformed.xz += W * sway * weight * uAmp;
       `
+    );
+    // mapのアルファの代わりに色の明度からアルファを生成し、黒縁をカット
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+      uniform float uCutLow;
+      uniform float uCutHigh;`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#ifdef USE_MAP
+        vec4 sampledDiffuseColor = texture2D( map, vUv );
+        sampledDiffuseColor = mapTexelToLinear( sampledDiffuseColor );
+        float key = sampledDiffuseColor.g;
+        float a = smoothstep( uCutLow, uCutHigh, key );
+        if (a <= 0.01) discard;
+        sampledDiffuseColor.a = a;
+        diffuseColor *= sampledDiffuseColor;
+      #endif`
     );
     mat.userData.shader = shader;
   };
