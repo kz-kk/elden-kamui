@@ -7,6 +7,7 @@ import { PMREMGenerator, CubeTextureLoader } from 'three';
 
 // 環境関連のインポート
 import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap, getAssetPath } from './js/environment.js';
+import { createTerrainMesh } from './js/terrain.js';
 
 // アニメーション関連のインポート
 import { analyzeAnimation } from './js/animation.js';
@@ -811,10 +812,9 @@ try {
     createDefaultEnvMap(scene, renderer);
 }
 
-// 地面の作成
+// 地面の作成（従来の平面に戻す）
 const groundGeometry = new THREE.PlaneGeometry(100, 100);
 const groundTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/dry_grassland.png');
-// const groundTexture = new THREE.TextureLoader().load('https://elden-kamui.netlify.app/assets/area/tsuchi.jpg');
 groundTexture.wrapS = THREE.RepeatWrapping;
 groundTexture.wrapT = THREE.RepeatWrapping;
 groundTexture.repeat.set(10, 10);
@@ -832,6 +832,30 @@ ground.rotation.x = -Math.PI / 2; // 水平に配置
 ground.position.y = -5.0; // 地面をさらに下げる
 ground.receiveShadow = true;
 scene.add(ground);
+
+// 地形をでこぼこに変更する関数（オプション）
+function makeTerrainBumpy() {
+    const vertices = groundGeometry.attributes.position.array;
+    for (let i = 0; i < vertices.length; i += 3) {
+        const x = vertices[i];
+        const z = vertices[i + 2];
+        
+        // シンプルなランダムな高さ変更
+        const height = (Math.sin(x * 0.1) * Math.cos(z * 0.1) + 
+                       Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5) * 1.5;
+        vertices[i + 1] = height;
+    }
+    groundGeometry.attributes.position.needsUpdate = true;
+    groundGeometry.computeVertexNormals();
+}
+
+// 5秒後にでこぼこ地形に変更（テスト用）
+setTimeout(() => {
+    console.log("地形をでこぼこに変更します");
+    makeTerrainBumpy();
+}, 5000);
+
+console.log("地面を作成しました");
 
 // 草を生やす関数（メモリ最適化済み）
 addGrass(scene, gameState);

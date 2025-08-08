@@ -8,7 +8,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // アセットパス設定（main.jsと同期）
 // ========================================
 // 注意：この設定はmain.jsと同期させる必要があります
-const USE_LOCAL_ASSETS = false; // true: ローカルアセットを使用, false: 外部URLを使用
+const USE_LOCAL_ASSETS = true; // true: ローカルアセットを使用, false: 外部URLを使用
 const EXTERNAL_BASE_URL = 'https://elden-kamui.netlify.app';
 const LOCAL_BASE_PATH = '..';
 
