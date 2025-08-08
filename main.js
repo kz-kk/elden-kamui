@@ -203,7 +203,7 @@ const gameState = {
     totalAssets: 0, // アセットローダーで動的に設定
     loadedAssets: 0,
     keysPressed: {},
-    playerPosition: new THREE.Vector3(0, -5.0, 0), // プレイヤーの位置を地面に合わせて調整（地面は-5.0）
+    playerPosition: new THREE.Vector3(0, -4.8, 0), // プレイヤーの位置を地面に合わせて調整（少し浮かせる）
     playerRotation: 0,
     dragonPosition: new THREE.Vector3(0, -5.0, 20), // ドラゴンの初期位置を設定
     cameraOffset: new THREE.Vector3(0, 2, 5), // カメラの相対位置
@@ -824,10 +824,11 @@ try {
 
 // チャンクマネージャークラス（openworldプロジェクトを参考に実装）
 class ChunkManager {
-    constructor(scene, chunkSize = 100, renderDistance = 3) {
+    constructor(scene, chunkSize = 300, renderDistance = 3) {
         this.scene = scene;
         this.chunkSize = chunkSize;
         this.renderDistance = renderDistance;
+        this.deleteDistance = renderDistance + 2; // 削除距離をより大きく
         this.chunks = new Map();
         this.playerChunk = { x: 0, z: 0 };
         
@@ -851,49 +852,70 @@ class ChunkManager {
     }
     
     createChunk(chunkX, chunkZ) {
-        // セグメント数を偶数にして、頂点が正確に境界に配置されるようにする
-        // 継ぎ目を安定させるため、チャンク境界に頂点が必ず一致する分割数に固定
-        const segments = 64;
-        // チャンクの境界で隙間が発生しないよう、わずかにオーバーラップさせる
-        const overlapAmount = 0.2;
+        // 大きなチャンクで境界平坦化による解決
+        const segments = 128; // より細かいセグメント
+        
         const geometry = new THREE.PlaneGeometry(
-            this.chunkSize + overlapAmount,
-            this.chunkSize + overlapAmount,
+            this.chunkSize,
+            this.chunkSize,
             segments,
             segments
         );
         
         
-        // マテリアルの作成
-        const material = new THREE.MeshStandardMaterial({
-            map: this.groundTexture,
-            color: 0x111111,  // 地面の色を極限まで暗く
-            roughness: 1.0,
-            metalness: 0.0,
-            emissive: new THREE.Color(0x000000) // 発光なし
-        });
+        // 共有マテリアルを使用（既に作成済みのものがあればそれを使用）
+        if (!this.sharedMaterial) {
+            this.sharedMaterial = new THREE.MeshStandardMaterial({
+                map: this.groundTexture,
+                color: 0x111111,  // 地面の色を極限まで暗く
+                roughness: 1.0,
+                metalness: 0.0,
+                emissive: new THREE.Color(0x000000) // 発光なし
+            });
+        }
+        const material = this.sharedMaterial;
         
         const vertices = geometry.attributes.position.array;
         const worldOffsetX = chunkX * this.chunkSize;
         const worldOffsetZ = chunkZ * this.chunkSize;
         
-        // 地形の高さを生成（XZ→Yの一貫座標系）
+        const uvs = geometry.attributes.uv.array;
+        
         for (let i = 0; i < vertices.length; i += 3) {
-            const localX = vertices[i];      // 平面上のX
-            const localZ = vertices[i + 1];  // 平面上のYをZとして扱う
-            const worldX = localX + worldOffsetX;
-            const worldZ = localZ + worldOffsetZ;
+            // ローカル座標
+            const localX = vertices[i];
+            const localZ = vertices[i + 1];
+            
+            // ワールド座標に変換
+            const worldX = worldOffsetX + this.chunkSize / 2 + localX;
+            const worldZ = worldOffsetZ + this.chunkSize / 2 + localZ;
+            
+            // 地形の高さを取得
             const height = this.getHeightAtPosition(worldX, worldZ);
-            vertices[i + 2] = height + 5; // 回転前のZに高さを入れて、後で-PI/2回転
+            
+            // 高さを設定
+            vertices[i + 2] = height;
+            
+                // ワールド座標ベースのUVマッピング（テクスチャの連続性を保証）
+            const uvIndex = (i / 3) * 2;
+            const textureScale = 0.05; // テクスチャのスケールを小さくして細かく
+            uvs[uvIndex] = (worldX * textureScale) % 1.0;     // U座標（0-1に正規化）
+            uvs[uvIndex + 1] = (worldZ * textureScale) % 1.0; // V座標（0-1に正規化）
         }
+        
+        // UVアトリビュートを更新
+        geometry.attributes.uv.needsUpdate = true;
         
         geometry.computeVertexNormals();
         
         const chunk = new THREE.Mesh(geometry, material);
         chunk.rotation.x = -Math.PI / 2;
-        chunk.position.x = worldOffsetX;
-        chunk.position.y = -5;  // 地面の基準高さ
-        chunk.position.z = worldOffsetZ;
+        
+        // チャンクの正確な位置設定（隙間なく配置）
+        chunk.position.x = worldOffsetX + this.chunkSize / 2;
+        chunk.position.y = -5.0;
+        chunk.position.z = worldOffsetZ + this.chunkSize / 2;
+        chunk.castShadow = true;
         chunk.receiveShadow = true;
         
         return chunk;
@@ -928,32 +950,132 @@ class ChunkManager {
             }
         }
         
-        // 不要なチャンクを削除
+        // 不要なチャンクを削除（削除距離を使用）
         for (const [key, chunk] of this.chunks) {
-            if (!chunksToKeep.has(key)) {
+            const [chunkX, chunkZ] = key.split(',').map(Number);
+            const dx = Math.abs(chunkX - this.playerChunk.x);
+            const dz = Math.abs(chunkZ - this.playerChunk.z);
+            const distance = Math.max(dx, dz);
+            
+            // 削除距離を超えたチャンクのみ削除
+            if (distance > this.deleteDistance) {
                 this.scene.remove(chunk);
                 chunk.geometry.dispose();
                 chunk.material.dispose();
                 this.chunks.delete(key);
-                console.log(`チャンクを削除: ${key}`);
+                console.log(`チャンクを削除: ${key} (距離: ${distance})`);
             }
         }
     }
     
     getHeightAtPosition(x, z) {
-        // 地形の高さを計算
-        let height = 0;
-        let frequency = 0.01;
-        let amplitude = 8;
+        // チャンク境界付近での平坦化処理
+        const chunkX = Math.floor(x / this.chunkSize);
+        const chunkZ = Math.floor(z / this.chunkSize);
+        const localX = x - (chunkX * this.chunkSize);
+        const localZ = z - (chunkZ * this.chunkSize);
         
-        for (let j = 0; j < 3; j++) {
-            height += Math.sin(x * frequency) * Math.cos(z * frequency) * amplitude;
-            height += Math.sin(x * frequency * 1.5) * Math.cos(z * frequency * 1.5) * amplitude * 0.5;
-            frequency *= 2;
-            amplitude *= 0.5;
+        // 境界からの距離を計算
+        const edgeDistance = Math.min(localX, this.chunkSize - localX, localZ, this.chunkSize - localZ);
+        const borderWidth = 20; // 境界の平坦化エリアの幅
+        
+        // 通常の地形生成
+        let height = 0;
+        let amplitude = 18.0;
+        let frequency = 0.0035;
+        
+        // 複数のオクターブでフラクタルノイズを生成
+        for (let i = 0; i < 5; i++) {
+            height += this.perlinNoise(x * frequency, z * frequency) * amplitude;
+            amplitude *= 0.55;
+            frequency *= 2.0;
         }
         
-        return height - 5;  // 基準高さを引く
+        // 適度な非線形変換
+        height = height * 1.4;
+        height = height > 0 ? Math.pow(height, 1.1) : -Math.pow(-height, 1.1);
+        
+        // 境界付近では平地に向けてスムーズに補間
+        if (edgeDistance < borderWidth) {
+            const flattenFactor = edgeDistance / borderWidth;
+            height *= flattenFactor; // 境界に近づくほど平地に
+        }
+        
+        // 基準レベル(-5.0)からの相対高度として返す
+        return height - 5.0;
+    }
+    
+    // 本格的なパーリンノイズ実装（連続性を保証）
+    perlinNoise(x, y) {
+        const xi = Math.floor(x);
+        const yi = Math.floor(y);
+        const xf = x - xi;
+        const yf = y - yi;
+        
+        // 4つの角での勾配ベクトルを取得
+        const g00 = this.gradientVector(xi, yi);
+        const g10 = this.gradientVector(xi + 1, yi);
+        const g01 = this.gradientVector(xi, yi + 1);
+        const g11 = this.gradientVector(xi + 1, yi + 1);
+        
+        // 各角から現在位置への距離ベクトル
+        const d00 = [xf, yf];
+        const d10 = [xf - 1, yf];
+        const d01 = [xf, yf - 1];
+        const d11 = [xf - 1, yf - 1];
+        
+        // ドット積計算
+        const n00 = this.dotProduct(g00, d00);
+        const n10 = this.dotProduct(g10, d10);
+        const n01 = this.dotProduct(g01, d01);
+        const n11 = this.dotProduct(g11, d11);
+        
+        // スムーズな補間
+        const u = this.fade(xf);
+        const v = this.fade(yf);
+        
+        const nx0 = this.lerp(n00, n10, u);
+        const nx1 = this.lerp(n01, n11, u);
+        
+        return this.lerp(nx0, nx1, v);
+    }
+    
+    // 勾配ベクトルを生成
+    gradientVector(x, y) {
+        const hash = this.hashInt(x, y) & 7; // 0-7の値
+        const gradients = [
+            [1, 0], [-1, 0], [0, 1], [0, -1],
+            [1, 1], [-1, 1], [1, -1], [-1, -1]
+        ];
+        return gradients[hash];
+    }
+    
+    // ドット積計算
+    dotProduct(grad, d) {
+        return grad[0] * d[0] + grad[1] * d[1];
+    }
+    
+    // 整数値のハッシュ関数
+    hashInt(x, y) {
+        let h = x * 374761393 + y * 668265263;
+        h = (h ^ (h >> 13)) * 1274126177;
+        return h ^ (h >> 16);
+    }
+    
+    // ハッシュ関数（一貫した擬似乱数を生成）
+    hash(x, y) {
+        let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        return (h - Math.floor(h)) * 2.0 - 1.0;  // -1 から 1 の範囲
+    }
+    
+    // 線形補間
+    lerp(a, b, t) {
+        return a + t * (b - a);
+    }
+    
+    // フェード関数（スムーズな補間のため）
+    fade(t) {
+        return t * t * t * (t * (t * 6 - 15) + 10);
     }
 }
 
@@ -964,7 +1086,7 @@ gameState.chunkManager = chunkManager;
 // 初期チャンクを生成
 chunkManager.updateChunks(gameState.playerPosition);
 
-console.log("無限地形システムを初期化しました");
+console.log("無限地形システムを再有効化しました");
 
 // 草を生やす関数（メモリ最適化済み）
 // TODO: チャンクごとに草を生成するように修正
@@ -989,19 +1111,21 @@ try {
             // GrassField はローカル中心座標で生成するため、
             // ワールド座標 = mesh.position + ローカル(x,z) とする。
             // ここではメッシュを原点に置く前提で、そのまま使用する。
-            return gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : gameState.groundLevel;
+            if (gameState.chunkManager) {
+                // 地形の高さを取得（基準レベルからの相対高度）
+                const terrainHeight = gameState.chunkManager.getHeightAtPosition(x, z);
+                return terrainHeight; // 基準レベルからの相対高度をそのまま使用
+            }
+            return gameState.groundLevel;
         },
-        baseY: 0.02,
+        baseY: 0.0, // 地形追従するのでベースオフセットは不要
     });
     // 草メッシュの原点は(0,0,0)。各インスタンスで高さに合わせているので原点は0でOK
     mesh.position.set(0, 0, 0);
     scene.add(mesh);
     grassField = { mesh, update };
-    // 地形の高さに草の根元を合わせる軽微な補正（中心のみ）
-    if (gameState.chunkManager) {
-        const centerY = gameState.chunkManager.getHeightAtPosition(0, 0);
-        mesh.position.y = centerY + 0.02;
-    }
+    // 草メッシュ全体の位置は基準レベルに配置
+    mesh.position.y = -5.0; // 基準レベルに配置（heightAtで個別調整済み）
 } catch (e) {
     console.warn('GrassField の初期化に失敗:', e);
 }
@@ -1256,14 +1380,14 @@ if (assetLoader) {
                                         if (child.material.color) newMat.color.copy(child.material.color);
                                         
                                         // 銀色の質感を設定
-                                        newMat.metalness = 0.7;
+                                        newMat.metalness = 1.0; // 待機と同じ設定
                                         newMat.roughness = 0.1;
-                                        newMat.envMapIntensity = 0.3;
+                                        newMat.envMapIntensity = 0.8; // 待機と同じ設定
                                         newMat.reflectivity = 1.0;
                                         newMat.clearcoat = 0.5;
                                         newMat.clearcoatRoughness = 0.1;
                                         newMat.side = THREE.DoubleSide;
-                                        newMat.needsUpdate = true;
+                                        newMat.needsUpdate = true; // 待機と同じく発光なし
                                         
                                         child.material = newMat;
                                     }
@@ -1362,14 +1486,14 @@ if (assetLoader) {
                                     if (child.material.normalMap) newMat.normalMap = child.material.normalMap;
                                     if (child.material.color) newMat.color.copy(child.material.color);
                                     
-                                    newMat.metalness = 0.7;
+                                    newMat.metalness = 1.0; // 待機と同じ設定
                                     newMat.roughness = 0.1;
-                                    newMat.envMapIntensity = 0.3;
+                                    newMat.envMapIntensity = 0.8; // 待機と同じ設定
                                     newMat.reflectivity = 1.0;
                                     newMat.clearcoat = 0.5;
                                     newMat.clearcoatRoughness = 0.1;
                                     newMat.side = THREE.DoubleSide;
-                                    newMat.needsUpdate = true;
+                                    newMat.needsUpdate = true; // 待機と同じく発光なし
                                     
                                     child.material = newMat;
                                 }
@@ -2322,15 +2446,14 @@ function movePlayer() {
         isMoving = true;
     }
     
-    // 地形の高さに合わせてプレイヤーのY座標を更新（ジャンプ等が無い現仕様）
+    // 地形の高さに合わせてプレイヤーのY座標を更新
     if (gameState.chunkManager) {
         const terrainY = gameState.chunkManager.getHeightAtPosition(
             gameState.playerPosition.x,
             gameState.playerPosition.z
         );
-        // 直接追従（必要ならスムージングに変更可）
-            // 少し地面から浮かせて潜りを防ぐ
-            gameState.playerPosition.y = terrainY + 0.05;
+        // プレイヤーを地形表面に配置
+        gameState.playerPosition.y = terrainY;
     } else {
         gameState.playerPosition.y = gameState.groundLevel;
     }

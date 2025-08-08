@@ -38,13 +38,15 @@ export function addGrass(scene, gameState) {
     const grassCount = 600; // 草の数を大幅に増やす（サイズを小さくして軽量化）
     const areaSize = 30;
     
-    // 草の色のバリエーション（画像に色を乗算）
+    // 草の色のバリエーション（極めて暗いマット系）
     const grassColors = [
-        new THREE.Color(0x8B4513), // サドルブラウン
-        new THREE.Color(0xA0522D), // シエナ
-        new THREE.Color(0xCD853F), // ペルー
-        new THREE.Color(0xD2B48C), // タン
-        new THREE.Color(0xDEB887)  // バーリーウッド
+        new THREE.Color(0x1A2010), // 極暗いオリーブグリーン
+        new THREE.Color(0x202815), // 極暗いダークオリーブ
+        new THREE.Color(0x252F18), // 極深い草色
+        new THREE.Color(0x1C2612), // 極暗い苔色
+        new THREE.Color(0x161F10), // 極影部分の草色
+        new THREE.Color(0x2A3420), // 極暗い中間色
+        new THREE.Color(0x222B1C)  // 極マットな緑
     ];
     
     // 草のテクスチャを読み込む（明示的にパスを指定）
@@ -80,7 +82,7 @@ export function addGrass(scene, gameState) {
             canvas.width = 64;
             canvas.height = 64;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#7CFC00'; // 明るい緑
+            ctx.fillStyle = '#1A2010'; // 極暗い草色
             ctx.fillRect(0, 0, 64, 64);
             grassTexture = new THREE.CanvasTexture(canvas);
             createGrassWithTexture();
@@ -161,9 +163,11 @@ export function addGrass(scene, gameState) {
             const spriteMaterial = new THREE.SpriteMaterial({
                 map: grassTexture,
                 transparent: true,
-                alphaTest: 0.1,
+                alphaTest: 0.5,
                 depthTest: true,
-                depthWrite: true
+                depthWrite: false,
+                blending: THREE.NormalBlending,
+                color: new THREE.Color(0.3, 0.3, 0.3) // 暗く調整
             });
             
             // 草の分布密度を上げるためのクラスタリング係数
@@ -231,8 +235,9 @@ export function addGrass(scene, gameState) {
                         // メッシュを作成（共通ジオメトリを使用）
                         const grassMesh = new THREE.Mesh(gameState.sharedGrassGeometry, material);
                         
-                        // 位置を設定
-                        grassMesh.position.set(x, -4.9, z);
+                        // 地形の高さに応じて配置
+                        const grassTerrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : -5.0;
+                        grassMesh.position.set(x, grassTerrainHeight + 0.1, z);
                         
                         // サイズを設定
                         grassMesh.scale.set(size * 0.6, size * (0.8 + Math.random() * 0.3), 1);
@@ -254,8 +259,9 @@ export function addGrass(scene, gameState) {
                         // スプライトを作成
                         const sprite = new THREE.Sprite(material);
                         
-                        // スプライトの位置設定
-                        sprite.position.set(x, -4.9, z); // 地面の高さに合わせて調整（-5.0より少し上）
+                        // 地形の高さに応じて配置
+                        const spriteTerrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : -5.0;
+                        sprite.position.set(x, spriteTerrainHeight + 0.1, z);
                         
                         // スプライトのサイズ設定（ランダム）
                         sprite.scale.set(size, size * (0.8 + Math.random() * 0.4), 1);
@@ -265,7 +271,7 @@ export function addGrass(scene, gameState) {
                         
                         // 風のアニメーション用のパラメータを追加
                         sprite.userData = {
-                            originalPosition: new THREE.Vector3(x, -4.9, z),
+                            originalPosition: new THREE.Vector3(x, spriteTerrainHeight + 0.1, z),
                             originalScale: new THREE.Vector2(sprite.scale.x, sprite.scale.y),
                             windPhase: Math.random() * Math.PI * 2, // ランダムな位相
                             windAmplitude: 0.05 + Math.random() * 0.1 // ランダムな揺れ幅
@@ -294,10 +300,12 @@ export function addGrass(scene, gameState) {
             // スプライト用のマテリアル（共通設定）
             const spriteMaterial = new THREE.SpriteMaterial({
                 map: grassTexture,
-                transparent: true,    // 透明を有効化
-                alphaTest: 0.1,       // 透明部分のカットオフ値を下げる（より細かい透明部分を表示）
-                depthTest: true,      // 深度テスト有効
-                depthWrite: true      // 深度書き込み有効
+                transparent: true,
+                alphaTest: 0.5,
+                depthTest: true,
+                depthWrite: false,
+                blending: THREE.NormalBlending,
+                color: new THREE.Color(0.3, 0.3, 0.3) // 暗く調整
             });
             
             // 草の分布密度を上げるためのクラスタリング係数
@@ -356,8 +364,9 @@ export function addGrass(scene, gameState) {
                     // スプライトを作成
                     const sprite = new THREE.Sprite(material);
                     
-                    // スプライトの位置設定
-                    sprite.position.set(x, -4.9, z); // 地面の高さに合わせて調整（-5.0より少し上）
+                    // 地形の高さに応じて配置
+                    const grassHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : -5.0;
+                    sprite.position.set(x, grassHeight + 0.1, z);
                     
                     // スプライトのサイズ設定（ランダム）
                     sprite.scale.set(size, size * (0.8 + Math.random() * 0.4), 1);
@@ -367,7 +376,7 @@ export function addGrass(scene, gameState) {
                     
                     // 風のアニメーション用のパラメータを追加
                     sprite.userData = {
-                        originalPosition: new THREE.Vector3(x, -4.9, z),
+                        originalPosition: new THREE.Vector3(x, grassHeight + 0.1, z),
                         originalScale: new THREE.Vector2(sprite.scale.x, sprite.scale.y),
                         windPhase: Math.random() * Math.PI * 2, // ランダムな位相
                         windAmplitude: 0.05 + Math.random() * 0.1 // ランダムな揺れ幅
@@ -520,10 +529,13 @@ export function addRocks(scene, gameState) {
                         z = Math.random() * areaSize * 2 - areaSize;
                     }
                     
+                    // 地形の高さを取得して岩を適切に配置
+                    const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : 0;
                     // 地面との関係を調整（サイズに応じて一部埋める）
                     const embeddedDepth = 0.1 + Math.random() * 0.5; // 埋め込み率（10%〜60%）に拡大
                     const adjustedHeight = sizeScale * embeddedDepth; // サイズに比例して埋める
-                    const y = -5.0 - adjustedHeight + (Math.random() * 0.1); // 地面の高さに合わせて調整
+                    // 地形の高さ（基準レベルからの相対高度）から埋め込み分を引く
+                    const y = terrainHeight - adjustedHeight + (Math.random() * 0.1);
                     
                     // 位置を設定
                     rock.position.set(x, y, z);
@@ -680,10 +692,13 @@ export function addRocks(scene, gameState) {
                                 z = Math.random() * areaSize * 2 - areaSize;
                             }
                             
+                            // 地形の高さを取得して岩を適切に配置
+                            const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : 0;
                             // 地面との関係を調整（サイズに応じて一部埋める）
                             const embeddedDepth = 0.1 + Math.random() * 0.5; // 埋め込み率（10%〜60%）に拡大
                             const adjustedHeight = sizeScale * embeddedDepth; // サイズに比例して埋める
-                            const y = -5.0 - adjustedHeight + (Math.random() * 0.1); // 地面の高さに合わせて調整
+                            // 地形の高さ（基準レベルからの相対高度）から埋め込み分を引く
+                            const y = terrainHeight - adjustedHeight + (Math.random() * 0.1);
                             
                             // 位置を設定
                             rock.position.set(x, y, z);

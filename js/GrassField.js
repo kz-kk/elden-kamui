@@ -45,7 +45,7 @@ export function createGrassField(opts = {}) {
     side: THREE.DoubleSide,
     roughness: 1.0,
     metalness: 0.0,
-    color: new THREE.Color(0xdddddd),
+    color: new THREE.Color(0x2a3520),
     emissive: new THREE.Color(0x000000),
     depthWrite: true,
     depthTest: true,
