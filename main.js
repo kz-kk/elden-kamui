@@ -7,6 +7,7 @@ import { PMREMGenerator, CubeTextureLoader } from 'three';
 
 // 環境関連のインポート
 import { addGrass, addRocks, updateGrassWind, createDefaultEnvMap, getAssetPath } from './js/environment.js';
+import { createGrassField } from './js/GrassField.js';
 import { createTerrainMesh } from './js/terrain.js';
 
 // アニメーション関連のインポート
@@ -613,15 +614,19 @@ function fireLightningFromOrb() {
 
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x4a4a4a); // 背景色をさらに明るく
+scene.background = new THREE.Color(0x151515); // 元の暗さに近い暗めの背景
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウマップを使用
+// glTF/PBR を正しく表示（騎士が黒くなるのを防ぐ）
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.85;
 
-// 最初はcanvasを非表示にする
-renderer.domElement.style.display = 'none';
+// 最初からcanvasを表示する（地面が消えたように見えるのを防ぐ）
+renderer.domElement.style.display = 'block';
 document.body.appendChild(renderer.domElement);
 
 // GLSLライトニングシステムの初期化
@@ -761,10 +766,10 @@ cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切
 // document.body.appendChild(cameraInfo);
 
 // 光源の設定
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // 環境光を少し暗くして影を目立たせる
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.15); // 環境光をもっと暗くして地面の過度な明るさを抑制
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // メイン光源を1.0に強化
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4); // 地面の明るさを更に抑制
 directionalLight.position.set(5, 15, 7.5); // 高い位置に配置して影を長くする
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.width = 4096; // 影の解像度を向上
@@ -785,83 +790,217 @@ directionalLight.shadow.normalBias = 0.02;
 scene.add(directionalLight);
 
 // 戦士モデル専用のポイントライト - モデルの質感を引き立てる
-const warriorLight = new THREE.PointLight(0xffffff, 1.2, 15); // 強度を1.2に上げる
+const warriorLight = new THREE.PointLight(0xffffff, 3.5, 12); // 騎士をより強く照らす
 warriorLight.position.set(0, 2, 0);
 warriorLight.castShadow = true;
 scene.add(warriorLight);
 
 // 戦士モデル専用のスポットライト - 上から照らす
-const warriorSpotLight = new THREE.SpotLight(0xffffff, 1.4, 20, Math.PI / 4, 0.5, 1); // 強度を1.4に上げる
+const warriorSpotLight = new THREE.SpotLight(0xffffff, 2.5, 20, Math.PI / 4, 0.3, 1);
 warriorSpotLight.position.set(0, 10, 0);
 warriorSpotLight.target.position.set(0, 0, 0);
 scene.add(warriorSpotLight);
 scene.add(warriorSpotLight.target);
 
-// 全体を照らす補助光
-const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5); // 強度を0.5に上げる
+// 全体を照らす補助光（更に弱くして地面を暗く）
+const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.1);
 scene.add(hemisphereLight);
 
-// 環境マップの設定（金属の反射に使用）
-try {
-    // console.log("環境マップの読み込みを試みます...");
-    // 環境マップのファイルが存在しない可能性があるため、すぐに代替手段を使用
-    createDefaultEnvMap(scene, renderer);
-} catch (e) {
-    // console.error("環境マップの設定中にエラーが発生しました:", e);
-    // エラー時も代替手段を使用
-    createDefaultEnvMap(scene, renderer);
-}
+// 騎士専用の明るいライト（常に追従）
+const knightLight = new THREE.PointLight(0xffffff, 4.0, 10);
+knightLight.position.set(0, 5, 2);
+scene.add(knightLight);
 
-// 地面の作成（従来の平面に戻す）
-const groundGeometry = new THREE.PlaneGeometry(100, 100);
-const groundTexture = new THREE.TextureLoader().load(getAssetPath('assets/area/dry_grassland.png'));
-groundTexture.wrapS = THREE.RepeatWrapping;
-groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(10, 10);
+// 環境マップは明るさ増加の原因になるため無効化（元の暗さを維持）
+scene.environment = null;
 
-// 地面のマテリアルを明るく設定
-const groundMaterial = new THREE.MeshStandardMaterial({ 
-    map: groundTexture,
-    roughness: 0.8, // 粗さを少し下げる（光の反射を増やす）
-    metalness: 0.0, // 金属性を少し上げる
-    color: 0x111111  // さらに明るい色に変更
-});
-
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2; // 水平に配置
-ground.position.y = -5.0; // 地面をさらに下げる
-ground.receiveShadow = true;
-scene.add(ground);
-
-// 地形をでこぼこに変更する関数（オプション）
-function makeTerrainBumpy() {
-    const vertices = groundGeometry.attributes.position.array;
-    for (let i = 0; i < vertices.length; i += 3) {
-        const x = vertices[i];
-        const z = vertices[i + 2];
+// チャンクマネージャークラス（openworldプロジェクトを参考に実装）
+class ChunkManager {
+    constructor(scene, chunkSize = 100, renderDistance = 3) {
+        this.scene = scene;
+        this.chunkSize = chunkSize;
+        this.renderDistance = renderDistance;
+        this.chunks = new Map();
+        this.playerChunk = { x: 0, z: 0 };
         
-        // シンプルなランダムな高さ変更
-        const height = (Math.sin(x * 0.1) * Math.cos(z * 0.1) + 
-                       Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5) * 1.5;
-        vertices[i + 1] = height;
+        // テクスチャの読み込み
+        const textureLoader = new THREE.TextureLoader();
+        this.groundTexture = textureLoader.load(getAssetPath('assets/area/dry_grassland.png'));
+        this.groundTexture.wrapS = THREE.RepeatWrapping;
+        this.groundTexture.wrapT = THREE.RepeatWrapping;
+        this.groundTexture.repeat.set(10, 10);
     }
-    groundGeometry.attributes.position.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
+    
+    getChunkKey(x, z) {
+        return `${x},${z}`;
+    }
+    
+    getChunkCoords(worldX, worldZ) {
+        return {
+            x: Math.floor(worldX / this.chunkSize),
+            z: Math.floor(worldZ / this.chunkSize)
+        };
+    }
+    
+    createChunk(chunkX, chunkZ) {
+        // セグメント数を偶数にして、頂点が正確に境界に配置されるようにする
+        // 継ぎ目を安定させるため、チャンク境界に頂点が必ず一致する分割数に固定
+        const segments = 64;
+        // チャンクの境界で隙間が発生しないよう、わずかにオーバーラップさせる
+        const overlapAmount = 0.2;
+        const geometry = new THREE.PlaneGeometry(
+            this.chunkSize + overlapAmount,
+            this.chunkSize + overlapAmount,
+            segments,
+            segments
+        );
+        
+        
+        // マテリアルの作成
+        const material = new THREE.MeshStandardMaterial({
+            map: this.groundTexture,
+            color: 0x888888,  // 暗めに抑える
+            roughness: 1.0,
+            metalness: 0.0,
+            emissive: new THREE.Color(0x000000) // 発光なし
+        });
+        
+        const vertices = geometry.attributes.position.array;
+        const worldOffsetX = chunkX * this.chunkSize;
+        const worldOffsetZ = chunkZ * this.chunkSize;
+        
+        // 地形の高さを生成（XZ→Yの一貫座標系）
+        for (let i = 0; i < vertices.length; i += 3) {
+            const localX = vertices[i];      // 平面上のX
+            const localZ = vertices[i + 1];  // 平面上のYをZとして扱う
+            const worldX = localX + worldOffsetX;
+            const worldZ = localZ + worldOffsetZ;
+            const height = this.getHeightAtPosition(worldX, worldZ);
+            vertices[i + 2] = height + 5; // 回転前のZに高さを入れて、後で-PI/2回転
+        }
+        
+        geometry.computeVertexNormals();
+        
+        const chunk = new THREE.Mesh(geometry, material);
+        chunk.rotation.x = -Math.PI / 2;
+        chunk.position.x = worldOffsetX;
+        chunk.position.y = -5;  // 地面の基準高さ
+        chunk.position.z = worldOffsetZ;
+        chunk.receiveShadow = true;
+        
+        return chunk;
+    }
+    
+    updateChunks(playerPosition) {
+        const currentChunk = this.getChunkCoords(playerPosition.x, playerPosition.z);
+        
+        // プレイヤーのチャンクが変わったかチェック
+        if (currentChunk.x !== this.playerChunk.x || currentChunk.z !== this.playerChunk.z) {
+            this.playerChunk = currentChunk;
+            console.log(`プレイヤーがチャンク (${currentChunk.x}, ${currentChunk.z}) に移動`);
+        }
+        
+        const chunksToKeep = new Set();
+        
+        // 必要なチャンクを生成
+        for (let dx = -this.renderDistance; dx <= this.renderDistance; dx++) {
+            for (let dz = -this.renderDistance; dz <= this.renderDistance; dz++) {
+                const chunkX = this.playerChunk.x + dx;
+                const chunkZ = this.playerChunk.z + dz;
+                const key = this.getChunkKey(chunkX, chunkZ);
+                
+                chunksToKeep.add(key);
+                
+                if (!this.chunks.has(key)) {
+                    const chunk = this.createChunk(chunkX, chunkZ);
+                    this.chunks.set(key, chunk);
+                    this.scene.add(chunk);
+                    console.log(`新しいチャンクを生成: ${key}`);
+                }
+            }
+        }
+        
+        // 不要なチャンクを削除
+        for (const [key, chunk] of this.chunks) {
+            if (!chunksToKeep.has(key)) {
+                this.scene.remove(chunk);
+                chunk.geometry.dispose();
+                chunk.material.dispose();
+                this.chunks.delete(key);
+                console.log(`チャンクを削除: ${key}`);
+            }
+        }
+    }
+    
+    getHeightAtPosition(x, z) {
+        // 地形の高さを計算
+        let height = 0;
+        let frequency = 0.01;
+        let amplitude = 8;
+        
+        for (let j = 0; j < 3; j++) {
+            height += Math.sin(x * frequency) * Math.cos(z * frequency) * amplitude;
+            height += Math.sin(x * frequency * 1.5) * Math.cos(z * frequency * 1.5) * amplitude * 0.5;
+            frequency *= 2;
+            amplitude *= 0.5;
+        }
+        
+        return height - 5;  // 基準高さを引く
+    }
 }
 
-// 5秒後にでこぼこ地形に変更（テスト用）
-setTimeout(() => {
-    console.log("地形をでこぼこに変更します");
-    makeTerrainBumpy();
-}, 5000);
+// チャンクマネージャーのインスタンスを作成
+const chunkManager = new ChunkManager(scene);
+gameState.chunkManager = chunkManager;
 
-console.log("地面を作成しました");
+// 初期チャンクを生成
+chunkManager.updateChunks(gameState.playerPosition);
+
+console.log("無限地形システムを初期化しました");
 
 // 草を生やす関数（メモリ最適化済み）
-addGrass(scene, gameState);
+// TODO: チャンクごとに草を生成するように修正
+// addGrass(scene, gameState);
+
+// GrassField を追加（Netlify 配信想定のブレードテクスチャ）
+let grassField = null;
+try {
+    const { mesh, update } = createGrassField({
+        count: 80000,
+        areaSize: 100,
+        bladeWidth: 0.14,
+        bladeHeight: 1.1,
+        alphaTest: 0.15,
+        // Netlify 上のパスを `getAssetPath` で解決
+        textureUrl: getAssetPath('assets/images/grass_blade.png'),
+        wind: new THREE.Vector2(0.8, 0.3),
+        noiseScale: 0.5,
+        swayAmplitude: 0.07,
+        castShadow: false,
+        heightAt: (x, z) => {
+            // GrassField はローカル中心座標で生成するため、
+            // ワールド座標 = mesh.position + ローカル(x,z) とする。
+            // ここではメッシュを原点に置く前提で、そのまま使用する。
+            return gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(x, z) : gameState.groundLevel;
+        },
+        baseY: 0.02,
+    });
+    // 草メッシュの原点は(0,0,0)。各インスタンスで高さに合わせているので原点は0でOK
+    mesh.position.set(0, 0, 0);
+    scene.add(mesh);
+    grassField = { mesh, update };
+    // 地形の高さに草の根元を合わせる軽微な補正（中心のみ）
+    if (gameState.chunkManager) {
+        const centerY = gameState.chunkManager.getHeightAtPosition(0, 0);
+        mesh.position.y = centerY + 0.02;
+    }
+} catch (e) {
+    console.warn('GrassField の初期化に失敗:', e);
+}
 
 // 岩を配置
-addRocks(scene, gameState);
+// TODO: チャンクごとに岩を配置するように修正
+// addRocks(scene, gameState);
 
 // スカイボックスの作成
 const skyGeometry = new THREE.SphereGeometry(500, 60, 40);
@@ -2175,6 +2314,19 @@ function movePlayer() {
         isMoving = true;
     }
     
+    // 地形の高さに合わせてプレイヤーのY座標を更新（ジャンプ等が無い現仕様）
+    if (gameState.chunkManager) {
+        const terrainY = gameState.chunkManager.getHeightAtPosition(
+            gameState.playerPosition.x,
+            gameState.playerPosition.z
+        );
+        // 直接追従（必要ならスムージングに変更可）
+            // 少し地面から浮かせて潜りを防ぐ
+            gameState.playerPosition.y = terrainY + 0.05;
+    } else {
+        gameState.playerPosition.y = gameState.groundLevel;
+    }
+
     // 攻撃処理（Fキー）
     if ((gameState.keysPressed['f'] || gameState.keysPressed['F']) && gameState.beamCooldown <= 0) {
         // ビームエフェクトを生成
@@ -2436,6 +2588,11 @@ function animate() {
         renderer.render(scene, camera);
         return;
     }
+    
+    // チャンクマネージャーの更新（ゲーム開始後のみ）
+    if (gameState.gameStarted && gameState.chunkManager) {
+        gameState.chunkManager.updateChunks(gameState.playerPosition);
+    }
 
     // GLSLライトニングシステムの更新
     glslLightningSystem.update(delta);
@@ -2457,6 +2614,11 @@ function animate() {
 
     // 各種エフェクトを更新
     updateAllEffects(gameState, scene);
+
+    // GrassField の更新（風アニメーション）
+    if (grassField && typeof grassField.update === 'function') {
+        grassField.update(clock.elapsedTime);
+    }
 
     // クールダウンタイマーの更新
     if (gameState.rollingCooldown > 0) gameState.rollingCooldown--;
@@ -2686,6 +2848,13 @@ function animate() {
             gameState.playerPosition.x,
             gameState.playerPosition.y,
             gameState.playerPosition.z
+        );
+        
+        // 騎士専用ライトを追従
+        knightLight.position.set(
+            gameState.playerPosition.x + 2,
+            gameState.playerPosition.y + 5,
+            gameState.playerPosition.z + 2
         );
     }
 

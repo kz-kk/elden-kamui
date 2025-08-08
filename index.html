@@ -769,7 +769,8 @@
     
     <!-- アセットパス設定スクリプト -->
     <script type="module">
-        import { getAssetPath } from 'https://elden-kamui.netlify.app/js/environment.js';
+        // import { getAssetPath } from 'https://elden-kamui.netlify.app/js/environment.js';
+        import { getAssetPath } from './js/environment.js';
 
         
         // DOMContentLoadedイベントで初期化
@@ -819,6 +820,7 @@
     </script>
         
     <!-- メインのJavaScriptファイル -->
-    <script type="module" src="https://elden-kamui.netlify.app/main.js"></script>
+    <!-- <script type="module" src="https://elden-kamui.netlify.app/main.js"></script> -->
+    <script type="module" src="./main.js"></script>
 </body>
 </html> 
