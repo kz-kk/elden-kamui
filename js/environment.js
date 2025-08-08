@@ -15,7 +15,7 @@ export function getAssetPath(relativePath) {
 
     try {
         // モジュールが配信されているオリジンを最優先（Netlifyから環境を配信する構成のため）
-        const moduleOrigin = (typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.url)
+        const moduleOrigin = (typeof import.meta !== 'undefined' && import.meta.url)
             ? new URL(import.meta.url).origin
             : (typeof window !== 'undefined' && window.location ? window.location.origin : '');
         const base = (moduleOrigin ? moduleOrigin : '') + '/';
