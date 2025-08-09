@@ -13,10 +13,10 @@ export function playFootstepSound(gameState) {
             gameState.sounds.footstep.stop();
         }
         // ミュート状態の場合は音量を0に、そうでなければランダムに変化させる
-        const volume = gameState.isMuted ? 0 : (0.4 + Math.random() * 0.2);
+        const volume = gameState.isMuted ? 0 : (0.3 + Math.random() * 0.1); // 音量を少し下げる
         gameState.sounds.footstep.setVolume(volume);
-        // 再生速度も少しランダムに（ピッチ変化）
-        gameState.sounds.footstep.setPlaybackRate(0.9 + Math.random() * 0.2);
+        // 再生速度も少しランダムに（ピッチ変化を抑える）
+        gameState.sounds.footstep.setPlaybackRate(0.85 + Math.random() * 0.1); // 0.85〜0.95でゆっくりめに
         // 再生
         gameState.sounds.footstep.play();
     }

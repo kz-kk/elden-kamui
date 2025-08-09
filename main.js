@@ -10,6 +10,7 @@ import { addRocks, createDefaultEnvMap, getAssetPath } from './js/environment.js
 import { initDebugUI, debugLog } from './js/debug.js';
 
 import { createTerrainMesh } from './js/terrain.js';
+import { OptimizedChunkManager } from './js/optimizedTerrain.js';
 // import { initLakeSystem, updateLakeSystem } from './js/lake.js';
 
 // アニメーション関連のインポート
@@ -631,10 +632,25 @@ try { initDebugUI(); debugLog('debug overlay ready'); } catch (_) {}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // 背景色を完全に黒に
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+// モバイル判定
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+const renderer = new THREE.WebGLRenderer({ 
+    antialias: !isMobile, // モバイルではアンチエイリアスを無効化
+    powerPreference: "high-performance" // 高性能GPUを優先
+});
+
+// モバイルでは解像度を下げる
+const pixelRatio = isMobile ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio;
+renderer.setPixelRatio(pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウマップを使用
+
+// モバイルでは影を無効化
+renderer.shadowMap.enabled = !isMobile;
+if (!isMobile) {
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // PCではソフトシャドウ
+}
 // glTF/PBR を正しく表示（騎士が黒くなるのを防ぐ）
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -672,7 +688,7 @@ if (particleCanvas) {
     // console.log("GLContext初期化結果:", gl);
     GLContext.resize(window.innerWidth, window.innerHeight);
     // console.log("GLSLLightningSystem作成開始");
-    glslLightningSystem = new GLSLLightningSystem(2000);
+    glslLightningSystem = new GLSLLightningSystem(500); // パーティクル数を大幅削減
     // console.log("GLSLLightningSystem作成完了:", glslLightningSystem);
 } else {
     console.error("particleCanvasが見つかりません");
@@ -786,9 +802,11 @@ scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.08); // メイン光源を極限まで暗く
 directionalLight.position.set(5, 15, 7.5); // 高い位置に配置して影を長くする
-directionalLight.castShadow = true;
-directionalLight.shadow.mapSize.width = 4096; // 影の解像度を向上
-directionalLight.shadow.mapSize.height = 4096;
+directionalLight.castShadow = !isMobile; // モバイルでは影を無効化
+if (!isMobile) {
+    directionalLight.shadow.mapSize.width = 4096; // 影の解像度を向上
+    directionalLight.shadow.mapSize.height = 4096;
+}
 
 // 影のカメラ範囲を設定してドラゴンも含むようにする
 directionalLight.shadow.camera.near = 0.1;
@@ -854,9 +872,9 @@ class ChunkManager {
         this.groundTexture.wrapT = THREE.RepeatWrapping;
         this.groundTexture.repeat.set(10, 10);
 
-        // チャンク内に配置する木の設定（複数種類）
-        this.minTreesPerChunk = 60; // ランダム最小数（密度アップ）
-        this.maxTreesPerChunk = 80; // ランダム最大数（密度アップ）
+        // チャンク内に配置する木の設定（軽量化のため大幅削減）
+        this.minTreesPerChunk = 15; // ランダム最小数
+        this.maxTreesPerChunk = 25; // ランダム最大数
         this.treeTemplates = []; // 複数のGLBテンプレート配列
         this.treeLoader = new GLTFLoader();
         this.treeModelUrls = [
@@ -956,8 +974,8 @@ class ChunkManager {
     }
     
     createChunk(chunkX, chunkZ) {
-        // 大きなチャンクで境界平坦化による解決
-        const segments = 128; // より細かいセグメント
+        // セグメント数を削減してパフォーマンス向上
+        const segments = 32; // 大幅に削減
         
         const geometry = new THREE.PlaneGeometry(
             this.chunkSize,
@@ -1067,9 +1085,24 @@ class ChunkManager {
             const minZ = worldOffsetZ + margin;
             const maxZ = worldOffsetZ + this.chunkSize - margin;
 
-            // 個数を決定
-            const minC = Math.max(0, Math.floor(this.minTreesPerChunk));
-            const maxC = Math.max(minC, Math.floor(this.maxTreesPerChunk));
+            // LODシステム: プレイヤーからの距離でツリー数を調整
+            const dx = Math.abs(chunkX - this.playerChunk.x);
+            const dz = Math.abs(chunkZ - this.playerChunk.z);
+            const chunkDistance = Math.max(dx, dz);
+            
+            // 距離に応じて樹木数を削減（全プラットフォームで軽量化）
+            let lodMultiplier = 1.0;
+            if (chunkDistance === 0) {
+                lodMultiplier = 0.8; // プレイヤーチャンク: 80%
+            } else if (chunkDistance === 1) {
+                lodMultiplier = 0.3; // 隣接チャンク: 30%
+            } else {
+                lodMultiplier = 0; // 2チャンク以上: 0%（描画しない）
+            }
+
+            // 個数を決定（LOD適用）
+            const minC = Math.max(0, Math.floor(this.minTreesPerChunk * lodMultiplier));
+            const maxC = Math.max(minC, Math.floor(this.maxTreesPerChunk * lodMultiplier));
             const count = minC + Math.floor(Math.random() * (maxC - minC + 1));
 
             for (let i = 0; i < count; i++) {
@@ -1083,6 +1116,24 @@ class ChunkManager {
                 // スケール（さらに大きく）
                 const scale = 10.0 + Math.random() * 8.0; // 12.0〜20.0
                 tree.scale.set(scale, scale, scale);
+                
+                // LODシステム: 遠距離の樹木の詳細度を下げる
+                if (chunkDistance >= 2) {
+                    // 遠くの樹木はシンプルなマテリアルに変更
+                    tree.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            // マテリアルをBasicMaterialに変更（影の計算を省略）
+                            const simpleMaterial = new THREE.MeshBasicMaterial({
+                                color: child.material.color || 0x228b22,
+                                map: child.material.map,
+                                side: THREE.DoubleSide
+                            });
+                            child.material = simpleMaterial;
+                            child.castShadow = false; // 遠くの樹木は影を落とさない
+                            child.receiveShadow = false;
+                        }
+                    });
+                }
 
                 // 位置（チャンク内部のランダム点）
                 const worldX = minX + Math.random() * (maxX - minX);
@@ -1145,16 +1196,16 @@ class ChunkManager {
                 // 木をグループに追加
                 treeGroup.add(tree);
                 
-                // グループにアニメーション情報を追加
-                treeGroup.userData.windAnimation = {
-                    originalRotation: treeGroup.rotation.clone(),
-                    phase: Math.random() * Math.PI * 2, // ランダムな位相
-                    amplitude: 0.08 + Math.random() * 0.06 // 0.08-0.14の振幅（大きめに）
-                };
-
-                // グループを風揺れアニメーション配列に追加
-                if (!gameState.windTrees) gameState.windTrees = [];
-                gameState.windTrees.push(treeGroup);
+                // 風アニメーションは完全に無効化（パフォーマンス優先）
+                // if (chunkDistance <= 1) {
+                //     treeGroup.userData.windAnimation = {
+                //         originalRotation: treeGroup.rotation.clone(),
+                //         phase: Math.random() * Math.PI * 2,
+                //         amplitude: 0.08 + Math.random() * 0.06
+                //     };
+                //     if (!gameState.windTrees) gameState.windTrees = [];
+                //     gameState.windTrees.push(treeGroup);
+                // }
 
                 // グループをチャンクに追加して管理
                 chunkGroup.add(treeGroup);
@@ -1181,8 +1232,15 @@ class ChunkManager {
             const minZ = worldOffsetZ + margin;
             const maxZ = worldOffsetZ + this.chunkSize - margin;
 
-            const minC = Math.max(0, Math.floor(this.minMountainsPerChunk));
-            const maxC = Math.max(minC, Math.floor(this.maxMountainsPerChunk));
+            // LODシステム: 山の数も距離で調整
+            const dx = Math.abs(chunkX - this.playerChunk.x);
+            const dz = Math.abs(chunkZ - this.playerChunk.z);
+            const chunkDistance = Math.max(dx, dz);
+            
+            let lodMultiplier = chunkDistance <= 1 ? 1.0 : 0.5; // 近距離100%、遠距離50%
+            
+            const minC = Math.max(0, Math.floor((this.minMountainsPerChunk || 2) * lodMultiplier));
+            const maxC = Math.max(minC, Math.floor((this.maxMountainsPerChunk || 4) * lodMultiplier));
             const count = minC + Math.floor(Math.random() * (maxC - minC + 1));
 
             for (let i = 0; i < count; i++) {
@@ -1196,6 +1254,24 @@ class ChunkManager {
 
                 // 回転（自然なランダム）
                 mountain.rotation.y = Math.random() * Math.PI * 2;
+                
+                // LODシステム: 遠距離の山も簡略化
+                if (chunkDistance >= 2) {
+                    mountain.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = false;
+                            child.receiveShadow = false;
+                            if (child.material) {
+                                // シンプルなマテリアルに変更
+                                const simpleMaterial = new THREE.MeshBasicMaterial({
+                                    color: child.material.color || 0x555555,
+                                    map: child.material.map
+                                });
+                                child.material = simpleMaterial;
+                            }
+                        }
+                    });
+                }
 
                 // 位置（チャンク内部のランダム点）
                 const worldX = minX + Math.random() * (maxX - minX);
@@ -1613,8 +1689,8 @@ class ChunkManager {
     }
 }
 
-// チャンクマネージャーのインスタンスを作成
-const chunkManager = new ChunkManager(scene);
+// チャンクマネージャーのインスタンスを作成（軽量化設定）
+const chunkManager = new ChunkManager(scene, 200, 2); // チャンクサイズを200、描画距離を2に削減
 gameState.chunkManager = chunkManager;
 
 // 初期チャンクを生成
@@ -3393,8 +3469,8 @@ function movePlayer() {
         // 足音タイマーをチェック
         if (!gameState.footstepTimer || gameState.footstepTimer <= 0) {
             playFootstepSound(gameState);
-            // 次の足音までの間隔をリセット
-            gameState.footstepTimer = 15;
+            // 次の足音までの間隔をリセット（20フレーム = 約0.33秒）
+            gameState.footstepTimer = 20;
         } else {
             // タイマーを減少
             gameState.footstepTimer--;
