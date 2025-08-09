@@ -10,6 +10,7 @@ import { addRocks, createDefaultEnvMap, getAssetPath } from './js/environment.js
 import { initDebugUI, debugLog } from './js/debug.js';
 
 import { createTerrainMesh } from './js/terrain.js';
+// import { initLakeSystem, updateLakeSystem } from './js/lake.js';
 
 // アニメーション関連のインポート
 import { analyzeAnimation } from './js/animation.js';
@@ -24,7 +25,10 @@ const ASSETS = {
         'player_run': 'assets/knight/run.glb', 
         'player_rolling': 'assets/knight/rolling.glb',
         'dragon_fly': 'assets/dragon/fly.glb',
-        'castle': 'assets/area/shiro.glb'
+        'castle': 'assets/area/stone_temple1.glb',
+        'temple2': 'assets/area/stone_temple2.glb',
+        'temple3': 'assets/area/stone_temple3.glb',
+        'temple4': 'assets/area/stone_temple4.glb'
     },
     // 音声ファイル
     sounds: {
@@ -1014,7 +1018,7 @@ class ChunkManager {
         if (!this.sharedMaterial) {
             this.sharedMaterial = new THREE.MeshStandardMaterial({
                 map: this.groundTexture,
-                color: 0x1a1a1a,  // やや暗めへ戻す
+                color: 0x151515,  // 少し明るく
                 roughness: 1.0,
                 metalness: 0.0,
                 emissive: new THREE.Color(0x000000) // 発光なし
@@ -1122,6 +1126,9 @@ class ChunkManager {
                 // 位置（チャンク内部のランダム点）
                 const worldX = minX + Math.random() * (maxX - minX);
                 const worldZ = minZ + Math.random() * (maxZ - minZ);
+                if (gameState && typeof gameState.isPointInLake === 'function' && gameState.isPointInLake(worldX, worldZ)) {
+                    continue; // 湖内は樹木を配置しない
+                }
                 const terrainHeight = this.getHeightAtPosition(worldX, worldZ);
 
                 // 向き・傾き
@@ -1244,6 +1251,9 @@ class ChunkManager {
                 // 位置（チャンク内部のランダム点）
                 const worldX = minX + Math.random() * (maxX - minX);
                 const worldZ = minZ + Math.random() * (maxZ - minZ);
+                if (gameState && typeof gameState.isPointInLake === 'function' && gameState.isPointInLake(worldX, worldZ)) {
+                    continue; // 湖内は山を配置しない
+                }
                 const terrainHeight = this.getHeightAtPosition(worldX, worldZ);
 
                 // 原点でボックス算出して底面合わせ
@@ -1401,7 +1411,11 @@ class ChunkManager {
             height *= flattenFactor; // 境界に近づくほど平地に
         }
         
-        // 相対高度（チャンクの基準Yは別途 -5.0 を加味する）
+        // 湖による地形のなだらかな沈下（ワールド座標ベース）
+        if (typeof gameState !== 'undefined' && gameState && Array.isArray((gameState.__lakes && gameState.__lakes.lakes))) {
+            // 互換: 今回は lake.js 側のユニフォームだけで見た目穴抜きしているため、
+            // ここで物理的に沈下させるのはオプション。初期は見た目の穴抜きのみに留める。
+        }
         return height;
     }
     
@@ -1486,7 +1500,14 @@ gameState.chunkManager = chunkManager;
 // 初期チャンクを生成
 chunkManager.updateChunks(gameState.playerPosition);
 
-console.log("無限地形システムを再有効化しました");
+// 湖システム初期化（停止中）
+// initLakeSystem(scene, gameState, {
+//   lakes: [
+//     { center: { x: 120, z: -80 }, radius: 90, rimWidth: 18, waterLevel: -5.0, depth: 8, color: 0x2e5b73, opacity: 0.85 },
+//   ],
+// });
+
+console.log("無限地形＋湖システムを有効化しました");
 
 // 草機能は削除済み
 
@@ -2096,6 +2117,201 @@ varying vec3 vWorldPos;
             } catch (e) {
                 console.error('城モデル読み込み例外:', e);
             }
+            
+            // stone_temple2の読み込み
+            try {
+                assetLoader.loadModel('temple2', (templeGltf) => {
+                    const temple = templeGltf.scene;
+                    // マテリアルをPBR（MeshPhysicalMaterial）に統一し、影を有効化
+                    temple.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                const toPhysical = (srcMat) => {
+                                    const pm = new THREE.MeshPhysicalMaterial();
+                                    if (srcMat.map) {
+                                        pm.map = srcMat.map;
+                                        if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
+                                        if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
+                                        pm.map.needsUpdate = true;
+                                    }
+                                    if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
+                                    if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
+                                    if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
+                                    if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
+                                    if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
+                                    if (srcMat.color) pm.color.copy(srcMat.color);
+                                    pm.color.multiplyScalar(0.65);
+                                    pm.metalness = 0.0;
+                                    pm.roughness = 0.95;
+                                    pm.envMapIntensity = 0.25;
+                                    pm.aoMapIntensity = 1.5;
+                                    pm.clearcoat = 0.0;
+                                    pm.side = THREE.FrontSide;
+                                    pm.needsUpdate = true;
+                                    return pm;
+                                };
+                                if (Array.isArray(child.material)) {
+                                    child.material = child.material.map(toPhysical);
+                                } else {
+                                    child.material = toPhysical(child.material);
+                                }
+                            }
+                        }
+                    });
+                    // 配置場所：castle から離れた位置
+                    const baseX = gameState.playerPosition ? gameState.playerPosition.x : 0;
+                    const baseZ = gameState.playerPosition ? gameState.playerPosition.z : 0;
+                    const targetX = baseX - 60; // 左方向60m
+                    const targetZ = baseZ + 20; // 前方20m
+                    const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
+                    const scale = 20;
+                    temple.scale.set(scale, scale, scale);
+                    temple.updateMatrixWorld(true);
+                    const bbox = new THREE.Box3().setFromObject(temple);
+                    const minY = bbox.min.y;
+                    const baseY = -5.0 + h;
+                    const finalY = baseY - minY - 0.5;
+                    temple.position.set(targetX, finalY, targetZ);
+                    scene.add(temple);
+                    // 簡易衝突用に登録
+                    if (!gameState.staticColliders) gameState.staticColliders = [];
+                    const cbox = new THREE.Box3().setFromObject(temple);
+                    const rad = cbox.getSize(new THREE.Vector3()).length() * 0.25;
+                    gameState.staticColliders.push({ position: new THREE.Vector3(targetX, finalY, targetZ), radius: rad });
+                });
+            } catch (e) {
+                console.error('temple2モデル読み込み例外:', e);
+            }
+            
+            // stone_temple3の読み込み
+            try {
+                assetLoader.loadModel('temple3', (templeGltf) => {
+                    const temple = templeGltf.scene;
+                    temple.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                const toPhysical = (srcMat) => {
+                                    const pm = new THREE.MeshPhysicalMaterial();
+                                    if (srcMat.map) {
+                                        pm.map = srcMat.map;
+                                        if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
+                                        if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
+                                        pm.map.needsUpdate = true;
+                                    }
+                                    if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
+                                    if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
+                                    if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
+                                    if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
+                                    if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
+                                    if (srcMat.color) pm.color.copy(srcMat.color);
+                                    pm.color.multiplyScalar(0.65);
+                                    pm.metalness = 0.0;
+                                    pm.roughness = 0.95;
+                                    pm.envMapIntensity = 0.25;
+                                    pm.aoMapIntensity = 1.5;
+                                    pm.clearcoat = 0.0;
+                                    pm.side = THREE.FrontSide;
+                                    pm.needsUpdate = true;
+                                    return pm;
+                                };
+                                if (Array.isArray(child.material)) {
+                                    child.material = child.material.map(toPhysical);
+                                } else {
+                                    child.material = toPhysical(child.material);
+                                }
+                            }
+                        }
+                    });
+                    const baseX = gameState.playerPosition ? gameState.playerPosition.x : 0;
+                    const baseZ = gameState.playerPosition ? gameState.playerPosition.z : 0;
+                    const targetX = baseX + 50; // 右方向50m
+                    const targetZ = baseZ - 40; // 後方40m
+                    const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
+                    const scale = 18;
+                    temple.scale.set(scale, scale, scale);
+                    temple.updateMatrixWorld(true);
+                    const bbox = new THREE.Box3().setFromObject(temple);
+                    const minY = bbox.min.y;
+                    const baseY = -5.0 + h;
+                    const finalY = baseY - minY - 0.5;
+                    temple.position.set(targetX, finalY, targetZ);
+                    scene.add(temple);
+                    if (!gameState.staticColliders) gameState.staticColliders = [];
+                    const cbox = new THREE.Box3().setFromObject(temple);
+                    const rad = cbox.getSize(new THREE.Vector3()).length() * 0.25;
+                    gameState.staticColliders.push({ position: new THREE.Vector3(targetX, finalY, targetZ), radius: rad });
+                });
+            } catch (e) {
+                console.error('temple3モデル読み込み例外:', e);
+            }
+            
+            // stone_temple4の読み込み  
+            try {
+                assetLoader.loadModel('temple4', (templeGltf) => {
+                    const temple = templeGltf.scene;
+                    temple.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                const toPhysical = (srcMat) => {
+                                    const pm = new THREE.MeshPhysicalMaterial();
+                                    if (srcMat.map) {
+                                        pm.map = srcMat.map;
+                                        if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
+                                        if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
+                                        pm.map.needsUpdate = true;
+                                    }
+                                    if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
+                                    if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
+                                    if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
+                                    if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
+                                    if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
+                                    if (srcMat.color) pm.color.copy(srcMat.color);
+                                    pm.color.multiplyScalar(0.65);
+                                    pm.metalness = 0.0;
+                                    pm.roughness = 0.95;
+                                    pm.envMapIntensity = 0.25;
+                                    pm.aoMapIntensity = 1.5;
+                                    pm.clearcoat = 0.0;
+                                    pm.side = THREE.FrontSide;
+                                    pm.needsUpdate = true;
+                                    return pm;
+                                };
+                                if (Array.isArray(child.material)) {
+                                    child.material = child.material.map(toPhysical);
+                                } else {
+                                    child.material = toPhysical(child.material);
+                                }
+                            }
+                        }
+                    });
+                    const baseX = gameState.playerPosition ? gameState.playerPosition.x : 0;
+                    const baseZ = gameState.playerPosition ? gameState.playerPosition.z : 0;
+                    const targetX = baseX - 30; // 左方向30m
+                    const targetZ = baseZ - 60; // 後方60m
+                    const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
+                    const scale = 22;
+                    temple.scale.set(scale, scale, scale);
+                    temple.updateMatrixWorld(true);
+                    const bbox = new THREE.Box3().setFromObject(temple);
+                    const minY = bbox.min.y;
+                    const baseY = -5.0 + h;
+                    const finalY = baseY - minY - 0.5;
+                    temple.position.set(targetX, finalY, targetZ);
+                    scene.add(temple);
+                    if (!gameState.staticColliders) gameState.staticColliders = [];
+                    const cbox = new THREE.Box3().setFromObject(temple);
+                    const rad = cbox.getSize(new THREE.Vector3()).length() * 0.25;
+                    gameState.staticColliders.push({ position: new THREE.Vector3(targetX, finalY, targetZ), radius: rad });
+                });
+            } catch (e) {
+                console.error('temple4モデル読み込み例外:', e);
+            }
 
             // ドラゴンモデルの読み込み試行
             try {
@@ -2132,21 +2348,21 @@ varying vec3 vWorldPos;
                                 if (Array.isArray(child.material)) {
                                     child.material = child.material.map(mat => {
                                         const newMat = mat.clone();
-                                        // 光沢をなくし、明るさのみ調整
-                                        newMat.roughness = 1.0; // 完全にマットな表面
-                                        newMat.metalness = 0.0; // 金属感をなくす
-                                        newMat.envMapIntensity = 0.0; // 環境マップの影響をなくす
-                                        newMat.color.multiplyScalar(1.3); // 色を50%明るく
+                                        // PBR照明（暗め設定）
+                                        newMat.roughness = 0.7; // リアルな粗さ
+                                        newMat.metalness = 0.2; // 軽微な金属感
+                                        newMat.envMapIntensity = 0.3; // 環境マップを復活
+                                        newMat.color.multiplyScalar(0.8); // 暗めに調整
                                         newMat.side = THREE.DoubleSide;
                                         return newMat;
                                     });
                                 } else {
                                     const newMat = child.material.clone();
-                                    // 光沢をなくし、明るさのみ調整
-                                    newMat.roughness = 1.0; // 完全にマットな表面
-                                    newMat.metalness = 0.0; // 金属感をなくす
-                                    newMat.envMapIntensity = 0.0; // 環境マップの影響をなくす
-                                    newMat.color.multiplyScalar(1.3); // 色を50%明るく
+                                    // PBR照明（暗め設定）
+                                    newMat.roughness = 0.7; // リアルな粗さ
+                                    newMat.metalness = 0.2; // 軽微な金属感
+                                    newMat.envMapIntensity = 0.3; // 環境マップを復活
+                                    newMat.color.multiplyScalar(0.8); // 暗めに調整
                                     newMat.side = THREE.DoubleSide;
                                     child.material = newMat;
                                 }
@@ -3183,6 +3399,8 @@ function animate() {
     frameCount++; // フレームカウンターを更新
 
     const delta = clock.getDelta();
+    // 湖の更新（停止中）
+    // updateLakeSystem(delta);
 
     // ゲームオーバー時は処理を減らす
     if (gameState.isGameOver) {

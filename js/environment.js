@@ -506,29 +506,51 @@ export function addRocks(scene, gameState) {
 
                     // ランダムな位置を決定
                     let x, z;
+                    let validPosition = false;
+                    let attempts = 0;
+                    const maxAttempts = 10;
                     
-                    // クラスタリング（75%の確率でクラスタ内に配置）
-                    if (Math.random() < 0.75 && clusterCenters.length > 0) {
-                        // クラスタからランダムに選択
-                        const clusterIndex = Math.floor(Math.random() * clusterCenters.length);
-                        const cluster = clusterCenters[clusterIndex];
-                        
-                        if (cluster) {
-                            const radius = 4 + Math.random() * 6; // クラスタ内の分散（4〜10m）- より広く
-                            const angle = Math.random() * Math.PI * 2;
-                            const distance = Math.random() * radius;
+                    while (!validPosition && attempts < maxAttempts) {
+                        // クラスタリング（75%の確率でクラスタ内に配置）
+                        if (Math.random() < 0.75 && clusterCenters.length > 0) {
+                            // クラスタからランダムに選択
+                            const clusterIndex = Math.floor(Math.random() * clusterCenters.length);
+                            const cluster = clusterCenters[clusterIndex];
                             
-                            x = cluster.x + Math.cos(angle) * distance;
-                            z = cluster.z + Math.sin(angle) * distance;
+                            if (cluster) {
+                                const radius = 4 + Math.random() * 6; // クラスタ内の分散（4〜10m）- より広く
+                                const angle = Math.random() * Math.PI * 2;
+                                const distance = Math.random() * radius;
+                                
+                                x = cluster.x + Math.cos(angle) * distance;
+                                z = cluster.z + Math.sin(angle) * distance;
+                            } else {
+                                // クラスタが見つからない場合はランダムな位置
+                                x = Math.random() * areaSize * 2 - areaSize;
+                                z = Math.random() * areaSize * 2 - areaSize;
+                            }
                         } else {
-                            // クラスタが見つからない場合はランダムな位置
+                            // 完全にランダムな位置
                             x = Math.random() * areaSize * 2 - areaSize;
                             z = Math.random() * areaSize * 2 - areaSize;
                         }
-                    } else {
-                        // 完全にランダムな位置
-                        x = Math.random() * areaSize * 2 - areaSize;
-                        z = Math.random() * areaSize * 2 - areaSize;
+                        
+                        // templeとの衝突判定
+                        validPosition = true;
+                        if (gameState.staticColliders) {
+                            for (const collider of gameState.staticColliders) {
+                                const dx = x - collider.position.x;
+                                const dz = z - collider.position.z;
+                                const distance = Math.sqrt(dx * dx + dz * dz);
+                                // templeの衝突半径に余裕を持たせて判定
+                                if (distance < collider.radius + sizeScale * 2) {
+                                    validPosition = false;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        attempts++;
                     }
                     
                     // 先に回転を決めてから底面で接地調整する
@@ -673,29 +695,51 @@ export function addRocks(scene, gameState) {
                             
                             // ランダムな位置を決定
                             let x, z;
+                            let validPosition = false;
+                            let attempts = 0;
+                            const maxAttempts = 10;
                             
-                            // クラスタリング（75%の確率でクラスタ内に配置）
-                            if (Math.random() < 0.75 && clusterCenters.length > 0) {
-                                // クラスタからランダムに選択
-                                const clusterIndex = Math.floor(Math.random() * clusterCenters.length);
-                                const cluster = clusterCenters[clusterIndex];
-                                
-                                if (cluster) {
-                                    const radius = 4 + Math.random() * 6; // クラスタ内の分散（4〜10m）- より広く
-                                    const angle = Math.random() * Math.PI * 2;
-                                    const distance = Math.random() * radius;
+                            while (!validPosition && attempts < maxAttempts) {
+                                // クラスタリング（75%の確率でクラスタ内に配置）
+                                if (Math.random() < 0.75 && clusterCenters.length > 0) {
+                                    // クラスタからランダムに選択
+                                    const clusterIndex = Math.floor(Math.random() * clusterCenters.length);
+                                    const cluster = clusterCenters[clusterIndex];
                                     
-                                    x = cluster.x + Math.cos(angle) * distance;
-                                    z = cluster.z + Math.sin(angle) * distance;
+                                    if (cluster) {
+                                        const radius = 4 + Math.random() * 6; // クラスタ内の分散（4〜10m）- より広く
+                                        const angle = Math.random() * Math.PI * 2;
+                                        const distance = Math.random() * radius;
+                                        
+                                        x = cluster.x + Math.cos(angle) * distance;
+                                        z = cluster.z + Math.sin(angle) * distance;
+                                    } else {
+                                        // クラスタが見つからない場合はランダムな位置
+                                        x = Math.random() * areaSize * 2 - areaSize;
+                                        z = Math.random() * areaSize * 2 - areaSize;
+                                    }
                                 } else {
-                                    // クラスタが見つからない場合はランダムな位置
+                                    // 完全にランダムな位置
                                     x = Math.random() * areaSize * 2 - areaSize;
                                     z = Math.random() * areaSize * 2 - areaSize;
                                 }
-                            } else {
-                                // 完全にランダムな位置
-                                x = Math.random() * areaSize * 2 - areaSize;
-                                z = Math.random() * areaSize * 2 - areaSize;
+                                
+                                // templeとの衝突判定
+                                validPosition = true;
+                                if (gameState.staticColliders) {
+                                    for (const collider of gameState.staticColliders) {
+                                        const dx = x - collider.position.x;
+                                        const dz = z - collider.position.z;
+                                        const distance = Math.sqrt(dx * dx + dz * dz);
+                                        // templeの衝突半径に余裕を持たせて判定
+                                        if (distance < collider.radius + sizeScale * 2) {
+                                            validPosition = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                attempts++;
                             }
                             
                             // 先に回転を決めてから底面で接地調整する
