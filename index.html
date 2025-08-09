@@ -443,6 +443,22 @@
             z-index: 999;
         }
         
+        #introVideo::-webkit-media-controls {
+            display: none !important;
+        }
+        
+        #introVideo::-webkit-media-controls-panel {
+            display: none !important;
+        }
+        
+        #introVideo::-webkit-media-controls-play-button {
+            display: none !important;
+        }
+        
+        #introVideo::-webkit-media-controls-start-playback-button {
+            display: none !important;
+        }
+        
         /* スキップヒントのスタイル */
         #skipHint {
             position: absolute;
@@ -757,7 +773,7 @@
     </div>
     
     <!-- 動画要素 -->
-    <video id="introVideo" style="display: none;">
+    <video id="introVideo" style="display: none;" playsinline muted preload="auto" webkit-playsinline>
                         <source src="" type="video/mp4" id="video-source">
     </video>
     
