@@ -4367,6 +4367,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     startScreen.style.display = 'none';
                     introVideo.style.display = 'block';
                     // console.log('ビデオ再生開始成功');
+                    
+                    // スマホ対応: 5秒後に自動的に動画を終了
+                    const videoTimeout = setTimeout(() => {
+                        if (gameState.videoPlaying && !gameState.gameStarted) {
+                            gameState.videoPlaying = false;
+                            if (!introVideo.paused) {
+                                introVideo.pause();
+                            }
+                            showGameScreen();
+                        }
+                    }, 5000); // 5秒後に自動終了
+                    
+                    // 動画が正常に終了した場合はタイマーをクリア
+                    introVideo.addEventListener('ended', () => {
+                        clearTimeout(videoTimeout);
+                    }, { once: true });
                 }).catch((error) => {
                     console.error('ビデオ再生エラー:', error);
                     // ビデオ再生に失敗した場合は直接ゲーム開始
