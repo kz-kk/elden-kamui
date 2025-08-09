@@ -112,11 +112,37 @@ export function updateDragon(gameState) {
         const currentRadius = gameState.dragonOrbitRadius * radiusMultiplier;
         
         const newX = gameState.playerPosition.x + Math.cos(gameState.dragonOrbitAngle) * currentRadius;
-        const newY = gameState.dragonHoverHeight + hoverOffset;
         const newZ = gameState.playerPosition.z + Math.sin(gameState.dragonOrbitAngle) * currentRadius;
         
-        // ドラゴンの位置を更新
-        dragonPosition.set(newX, newY, newZ);
+        // 地形に応じた高度調整
+        const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(newX, newZ) : 0;
+        const minY = -5.0 + terrainHeight + 5.0; // 地面から最低5ユニット上
+        const targetY = gameState.dragonHoverHeight + hoverOffset;
+        const newY = Math.max(minY, targetY);
+        
+        // Temple等の静的衝突物との衝突判定
+        let validPosition = true;
+        if (gameState.staticColliders) {
+            for (const collider of gameState.staticColliders) {
+                const dx = newX - collider.position.x;
+                const dz = newZ - collider.position.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+                
+                // ドラゴンのサイズを考慮した衝突半径（ドラゴンは大きいので余裕をもたせる）
+                if (distance < collider.radius + 15) { // ドラゴン用の大きな衝突半径
+                    validPosition = false;
+                    break;
+                }
+            }
+        }
+        
+        // 衝突がない場合のみ位置更新
+        if (validPosition) {
+            dragonPosition.set(newX, newY, newZ);
+        } else {
+            // 衝突がある場合は角度を少し進めて回避
+            gameState.dragonOrbitAngle += 0.1;
+        }
 
         // 低空飛行時は傾きを強める
         const baseTiltAmount = 0.25;

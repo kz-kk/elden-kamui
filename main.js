@@ -106,7 +106,7 @@ class AssetLoader {
     
     loadTexture(key, onSuccess, onError) {
         const path = getAssetPath(ASSETS.textures[key]);
-        console.log(`Loading texture: ${key} from ${path}`);
+        // console.log(`Loading texture: ${key} from ${path}`);
         
         this.textureLoader.load(
             path,
@@ -179,7 +179,9 @@ import { playFootstepSound, playButtonClickSound } from './js/sound.js';
 import { updateDragon } from './js/dragon.js';
 
 // 霧エフェクトモジュールをインポート
-import { createFogEffect } from './js/effects/fogEffect.js';
+// import { createFogEffect } from './js/effects/fogEffect.js';
+// 草フィールドモジュールをインポート
+// import { createGrassField } from './js/GrassField.js';
 import { 
     createYellowParticleEffect, 
     createParticleColumn, 
@@ -352,7 +354,7 @@ const gameState = {
     columnSpawnTimer: 0,
     columnParticleCount: 240, // 粒子数を増やす
     columnSize: 0.3, // サイズを大きくして見やすく
-    columnLifetime: 150,
+    columnLifetime: 1800, // 寿命を30秒に延長
     columnSpawnInterval: 200, // 生成間隔を短くして頻繁に出現
     
     // 黄色い粒子エフェクト用のパラメータ
@@ -420,9 +422,9 @@ const gameState = {
     isOnRock: false, // 岩の上にいるかどうか
     
     // 体力回復関連のパラメータ
-    healingTimer: 30, // 体力回復のタイマー（初期値を間隔と同じに設定）
-    healingInterval: 30, // 体力回復の間隔（フレーム単位）
-    healingAmount: 3, // 1回の回復量を増加
+    healingTimer: 0, // 体力回復のタイマー（初期値を0に設定で即座に回復）
+    healingInterval: 15, // 体力回復の間隔を短縮（フレーム単位）
+    healingAmount: 4, // 1回の回復量を増加
     
     // グローバルミュート状態
     isMuted: false, // ゲーム全体のミュート状態
@@ -593,7 +595,7 @@ function fireLightningFromOrb() {
                 if (gameState.sounds.thunder.isPlaying) {
                     gameState.sounds.thunder.stop();
                 }
-                gameState.sounds.thunder.setVolume(0.7);
+                gameState.sounds.thunder.setVolume(0.4);
                 gameState.sounds.thunder.play();
             } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {
                 if (gameState.sounds.fire.isPlaying) {
@@ -852,22 +854,34 @@ class ChunkManager {
         this.groundTexture.wrapT = THREE.RepeatWrapping;
         this.groundTexture.repeat.set(10, 10);
 
-        // チャンク内に配置する木（オーク）の設定
+        // チャンク内に配置する木の設定（複数種類）
         this.minTreesPerChunk = 60; // ランダム最小数（密度アップ）
         this.maxTreesPerChunk = 80; // ランダム最大数（密度アップ）
-        this.treeTemplate = null;  // GLBテンプレート
+        this.treeTemplates = []; // 複数のGLBテンプレート配列
         this.treeLoader = new GLTFLoader();
-        this.treeModelUrl = getAssetPath('assets/area/oak_tree_3D.glb');
+        this.treeModelUrls = [
+            getAssetPath('assets/area/oak_tree_3D.glb'),
+            getAssetPath('assets/area/pine_tree_3D.glb')
+        ];
 
-        // 木モデルを一度だけロード
-        try {
+        // 複数の木モデルを順次ロード
+        this.loadTreeModels();
+
+    }
+
+    // 複数の木モデルをロードするメソッド
+    loadTreeModels() {
+        let loadedCount = 0;
+        const totalModels = this.treeModelUrls.length;
+
+        this.treeModelUrls.forEach((url, index) => {
             this.treeLoader.load(
-                this.treeModelUrl,
+                url,
                 (gltf) => {
-                    this.treeTemplate = gltf.scene;
-
+                    const treeTemplate = gltf.scene;
+                    
                     // マテリアルと影の調整（暗い環境に合わせる）
-                    this.treeTemplate.traverse((child) => {
+                    treeTemplate.traverse((child) => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
@@ -876,14 +890,14 @@ class ChunkManager {
                                     const newMat = mat.clone();
                                     // PBR調整（暗所でも黒潰れしにくく）
                                     newMat.metalness = 0.0;
-                                    newMat.roughness = 0.95;
-                                    newMat.envMapIntensity = 0.1;
+                                    newMat.roughness = 0.9;
+                                    newMat.envMapIntensity = 0.2;
                                     if (newMat.color) {
-                                        newMat.color.multiplyScalar(0.85);
+                                        newMat.color.multiplyScalar(0.8);
                                     }
                                     if ('emissive' in newMat) {
                                         newMat.emissive = new THREE.Color(0x0a0a0a);
-                                        if ('emissiveIntensity' in newMat) newMat.emissiveIntensity = 0.08;
+                                        if ('emissiveIntensity' in newMat) newMat.emissiveIntensity = 0.05;
                                     }
                                     // 葉の両面表示にして真っ黒を回避（裏面が見える場合）
                                     newMat.side = THREE.DoubleSide;
@@ -905,89 +919,28 @@ class ChunkManager {
                         }
                     });
 
-                    // 既存のチャンクにも木を配置
-                    for (const [key, chunkGroup] of this.chunks) {
-                        if (!chunkGroup || !chunkGroup.userData) continue;
-                        const { chunkX, chunkZ } = chunkGroup.userData;
-                        if (typeof chunkX === 'number' && typeof chunkZ === 'number') {
-                            this.populateTreesInChunk(chunkGroup, chunkX, chunkZ);
+                    // テンプレート配列に追加
+                    this.treeTemplates[index] = treeTemplate;
+                    loadedCount++;
+                
+                    
+                    // 全てのモデルが読み込まれたら既存チャンクに配置
+                    if (loadedCount === totalModels) {
+                        for (const [key, chunkGroup] of this.chunks) {
+                            if (!chunkGroup || !chunkGroup.userData) continue;
+                            const { chunkX, chunkZ } = chunkGroup.userData;
+                            if (typeof chunkX === 'number' && typeof chunkZ === 'number') {
+                                this.populateTreesInChunk(chunkGroup, chunkX, chunkZ);
+                            }
                         }
                     }
                 },
                 undefined,
                 (err) => {
-                    console.error('木モデルの読み込みに失敗:', err);
+                    console.error(`木モデル読み込み失敗 ${url}:`, err);
+                    loadedCount++;
                 }
             );
-        } catch (e) {
-            console.error('木モデル読み込み例外:', e);
-        }
-
-        // 大型の石山（マウンテン）配置設定
-        this.minMountainsPerChunk = 0; // デフォルトは少なめ
-        this.maxMountainsPerChunk = 2; // 0〜2個ランダム
-        this.mountainTemplates = [];   // 複数テンプレート
-        this.mountainLoader = new GLTFLoader();
-        this.mountainModelUrls = [
-            getAssetPath('assets/area/stone_mountain1.glb'),
-            getAssetPath('assets/area/stone_mountain2.glb')
-        ];
-        // ロードしてPBR化
-        const toPhysicalMaterial = (srcMat) => {
-            const pm = new THREE.MeshPhysicalMaterial();
-            if (srcMat.map) {
-                pm.map = srcMat.map;
-                if ('encoding' in pm.map) pm.map.encoding = THREE.sRGBEncoding;
-                if ('colorSpace' in pm.map && THREE.SRGBColorSpace) pm.map.colorSpace = THREE.SRGBColorSpace;
-                pm.map.needsUpdate = true;
-            }
-            if (srcMat.normalMap) pm.normalMap = srcMat.normalMap;
-            if (srcMat.roughnessMap) pm.roughnessMap = srcMat.roughnessMap;
-            if (srcMat.metalnessMap) pm.metalnessMap = srcMat.metalnessMap;
-            if (srcMat.aoMap) pm.aoMap = srcMat.aoMap;
-            if (srcMat.emissiveMap) pm.emissiveMap = srcMat.emissiveMap;
-            if (srcMat.color) pm.color.copy(srcMat.color);
-            pm.metalness = 0.0;
-            pm.roughness = 0.95;
-            pm.envMapIntensity = 0.3;
-            pm.side = THREE.FrontSide;
-            pm.needsUpdate = true;
-            return pm;
-        };
-        const onMountainLoaded = (gltf) => {
-            const tpl = gltf.scene;
-            tpl.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            child.material = child.material.map(toPhysicalMaterial);
-                        } else {
-                            child.material = toPhysicalMaterial(child.material);
-                        }
-                    }
-                }
-            });
-            this.mountainTemplates.push(tpl);
-            // 既存チャンクにも山を適用
-            for (const [key, chunkGroup] of this.chunks) {
-                if (!chunkGroup || !chunkGroup.userData) continue;
-                const { chunkX, chunkZ } = chunkGroup.userData;
-                if (typeof chunkX === 'number' && typeof chunkZ === 'number') {
-                    this.populateMountainsInChunk(chunkGroup, chunkX, chunkZ);
-                }
-            }
-        };
-        // 2モデルを非同期ロード
-        this.mountainModelUrls.forEach((url) => {
-            try {
-                this.mountainLoader.load(url, onMountainLoaded, undefined, (err) => {
-                    console.error('山モデルの読み込みに失敗:', url, err);
-                });
-            } catch (e) {
-                console.error('山モデル読み込み例外:', url, e);
-            }
         });
     }
     
@@ -1080,8 +1033,8 @@ class ChunkManager {
             chunkZ,
         };
 
-        // 木（オーク）をこのチャンクに配置（テンプレートが読み込み済みなら）
-        if (this.treeTemplate) {
+        // 木をこのチャンクに配置（テンプレートが読み込み済みなら）
+        if (this.treeTemplates && this.treeTemplates.length > 0) {
             this.populateTreesInChunk(chunkGroup, chunkX, chunkZ);
         }
         // 山（マウンテン）を配置（テンプレートが読み込み済みなら）
@@ -1089,13 +1042,16 @@ class ChunkManager {
             this.populateMountainsInChunk(chunkGroup, chunkX, chunkZ);
         }
         
+        // 草を配置
+        // this.populateGrassInChunk(chunkGroup, chunkX, chunkZ);
+        
         return chunkGroup;
     }
 
     // チャンク内に木をランダム配置
     populateTreesInChunk(chunkGroup, chunkX, chunkZ) {
         try {
-            if (!this.treeTemplate || !chunkGroup || !chunkGroup.userData) return;
+            if (!this.treeTemplates || this.treeTemplates.length === 0 || !chunkGroup || !chunkGroup.userData) return;
 
             // 既に配置済みなら二重配置を避ける
             if (Array.isArray(chunkGroup.userData.trees) && chunkGroup.userData.trees.length > 0) return;
@@ -1117,10 +1073,15 @@ class ChunkManager {
             const count = minC + Math.floor(Math.random() * (maxC - minC + 1));
 
             for (let i = 0; i < count; i++) {
-                const tree = this.treeTemplate.clone(true);
+                // 複数のテンプレートからランダムに選択
+                const templateIndex = Math.floor(Math.random() * this.treeTemplates.length);
+                const selectedTemplate = this.treeTemplates[templateIndex];
+                if (!selectedTemplate) continue; // テンプレートが読み込まれていない場合はスキップ
+                
+                const tree = selectedTemplate.clone(true);
 
                 // スケール（さらに大きく）
-                const scale = 8.0 + Math.random() * 6.0; // 8.0〜14.0
+                const scale = 10.0 + Math.random() * 8.0; // 12.0〜20.0
                 tree.scale.set(scale, scale, scale);
 
                 // 位置（チャンク内部のランダム点）
@@ -1158,58 +1119,46 @@ class ChunkManager {
                 const uMinY = worldBBox.min.y;
                 const uMaxY = worldBBox.max.y;
 
-                // マテリアルに風揺れシェーダを注入（上部のみ）
-                const applyTreeWindToMaterial = (mat) => {
-                    const material = mat.clone();
-                    material.onBeforeCompile = (shader) => {
-                        const height = Math.max(uMaxY - uMinY, 0.0001);
-                        const ampWorld = Math.max(height * 0.02, 0.3) * (0.8 + Math.random() * 0.6) * gameState.treeWindBaseAmp; // スケール連動
-                        shader.uniforms.uTime = { value: 0 };
-                        shader.uniforms.uWind = { value: new THREE.Vector2(1.0, 0.35) };
-                        shader.uniforms.uAmp = { value: ampWorld };
-                        shader.uniforms.uMinY = { value: uMinY };
-                        shader.uniforms.uMaxY = { value: uMaxY };
-                        shader.uniforms.uFreq = { value: 0.8 + Math.random() * 0.6 };
-
-                        // worldPos を使って上部だけ揺らす
-                        shader.vertexShader = shader.vertexShader
-                            .replace('#include <common>', `#include <common>\nuniform float uTime;\nuniform vec2 uWind;\nuniform float uAmp;\nuniform float uMinY;\nuniform float uMaxY;\nuniform float uFreq;`)
-                            .replace('#include <begin_vertex>', `#include <begin_vertex>\n{
-    vec4 wp = modelMatrix * vec4(transformed, 1.0);
-    float tip = clamp((wp.y - uMinY) / max(uMaxY - uMinY, 0.0001), 0.0, 1.0);
-    // 2軸に少し位相差を付けて複合揺れ
-    float wpx = wp.x * 0.12; float wpz = wp.z * 0.15;
-    float s1 = sin(uTime * uFreq + wpx + wpz);
-    float s2 = cos(uTime * (uFreq*1.3) + wpx*0.7 - wpz*0.5);
-    float n = (s1 * 0.6 + s2 * 0.4);
-    vec2 dir = normalize(uWind);
-    transformed.x += dir.x * n * uAmp * tip;
-    transformed.z += dir.y * n * uAmp * tip;
-}`);
-
-                        material.userData.shader = shader;
-                    };
-                    material.needsUpdate = true;
-                    // 初期値を保存
-                    material.userData.treeWind = { uMinY, uMaxY };
-                    // 更新対象に登録
-                    gameState.treeWindMaterials.push(material);
-                    return material;
+                // 木の根本を軸にした回転のため、Groupを作成
+                const treeGroup = new THREE.Group();
+                
+                // 元の木の位置情報を保存
+                const originalTreePosition = tree.position.clone();
+                const originalTreeRotation = tree.rotation.clone();
+                
+                // 木の底部の実際の高さを計算（ワールド座標）
+                const bottomY = uMinY; // 木の最下部のワールドY座標
+                
+                // グループを木の根本（底部）位置に配置
+                treeGroup.position.set(
+                    originalTreePosition.x,
+                    bottomY, // 木の実際の底部位置を軸に
+                    originalTreePosition.z
+                );
+                treeGroup.rotation.copy(originalTreeRotation);
+                
+                // 木をグループ内でオフセット（根本がグループの原点になるように）
+                const offsetY = originalTreePosition.y - bottomY; // 元の位置から底部までのオフセット
+                tree.position.set(0, offsetY, 0); // グループ内での相対位置
+                tree.rotation.set(0, 0, 0); // グループ内での回転はリセット
+                
+                // 木をグループに追加
+                treeGroup.add(tree);
+                
+                // グループにアニメーション情報を追加
+                treeGroup.userData.windAnimation = {
+                    originalRotation: treeGroup.rotation.clone(),
+                    phase: Math.random() * Math.PI * 2, // ランダムな位相
+                    amplitude: 0.08 + Math.random() * 0.06 // 0.08-0.14の振幅（大きめに）
                 };
 
-                tree.traverse((child) => {
-                    if (child.isMesh) {
-                        if (Array.isArray(child.material)) {
-                            child.material = child.material.map(applyTreeWindToMaterial);
-                        } else if (child.material) {
-                            child.material = applyTreeWindToMaterial(child.material);
-                        }
-                    }
-                });
+                // グループを風揺れアニメーション配列に追加
+                if (!gameState.windTrees) gameState.windTrees = [];
+                gameState.windTrees.push(treeGroup);
 
-                // グループにぶら下げて管理
-                chunkGroup.add(tree);
-                chunkGroup.userData.trees.push(tree);
+                // グループをチャンクに追加して管理
+                chunkGroup.add(treeGroup);
+                chunkGroup.userData.trees.push(treeGroup);
             }
         } catch (e) {
             console.warn('チャンクへの木配置に失敗:', e);
@@ -1277,13 +1226,171 @@ class ChunkManager {
         }
     }
     
+    // チャンク内にシンプルな草をランダム配置（LODシステム対応）
+    // populateGrassInChunk(chunkGroup, chunkX, chunkZ) {
+    //     try {
+    //         if (!chunkGroup || !chunkGroup.userData) return;
+            
+    //         // 既に配置済みなら二重配置を避ける
+    //         if (chunkGroup.userData.simpleGrass) return;
+            
+    //         console.log(`草を配置開始: チャンク(${chunkX}, ${chunkZ})`);
+            
+    //         // チャンクのワールド位置を計算
+    //         const worldOffsetX = chunkX * this.chunkSize;
+    //         const worldOffsetZ = chunkZ * this.chunkSize;
+            
+    //         // LODシステム: プレイヤーがいるチャンクかどうかで密度を変える
+    //         const isPlayerChunk = (chunkX === this.playerChunk.x && chunkZ === this.playerChunk.z);
+    //         const grassCount = isPlayerChunk ? 3000 : 500; // プレイヤーチャンクは高密度、他は低密度（大幅削減）
+            
+    //         console.log(`草密度設定: ${isPlayerChunk ? '高密度(プレイヤーチャンク)' : '低密度'} - ${grassCount}本`);
+            
+    //         // シンプルな線状の草を作成
+    //         const grassGeometry = new THREE.BufferGeometry();
+    //         const positions = [];
+            
+    //         // 草は単純な線（2点）
+    //         const height = 1.0;
+    //         positions.push(
+    //             0, 0, 0,        // 根本
+    //             0, height, 0    // 先端
+    //         );
+            
+    //         grassGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            
+    //         // 線のマテリアル（自然な緑色）
+    //         const grassMaterial = new THREE.LineBasicMaterial({
+    //             color: 0x4a8b3a, // 自然な草の緑
+    //             linewidth: 2     // 線の太さ
+    //         });
+            
+    //         // 草を格納する配列
+    //         const grassLines = [];
+            
+    //         // 各草の位置を設定（クラスター配置で密集させる）
+    //         const dummy = new THREE.Object3D();
+    //         const clusterCount = isPlayerChunk ? 120 : 50; // プレイヤーチャンクは高密度クラスター、他は低密度（大幅削減）
+    //         const grassPerCluster = Math.floor(grassCount / clusterCount);
+    //         let grassIndex = 0;
+            
+    //         for (let cluster = 0; cluster < clusterCount && grassIndex < grassCount; cluster++) {
+    //             // クラスターの中心位置（チャンク全体をカバー）
+    //             const clusterCenterX = worldOffsetX + (Math.random() - 0.5) * this.chunkSize * 0.98;
+    //             const clusterCenterZ = worldOffsetZ + (Math.random() - 0.5) * this.chunkSize * 0.98;
+    //             const clusterRadius = 0.8 + Math.random() * 0.7; // 小さく密集したクラスター
+                
+    //             // クラスター内に草を密集配置
+    //             for (let g = 0; g < grassPerCluster && grassIndex < grassCount; g++) {
+    //                 // クラスター内により密集した配置
+    //                 const angle = Math.random() * Math.PI * 2;
+    //                 const distance = Math.random() * clusterRadius;
+    //                 const worldX = clusterCenterX + Math.cos(angle) * distance;
+    //                 const worldZ = clusterCenterZ + Math.sin(angle) * distance;
+                    
+    //                 // 地形高度を取得
+    //                 const terrainHeight = this.getHeightAtPosition(worldX, worldZ);
+    //                 const groundY = -5.0 + terrainHeight;
+    //                 const grassY = groundY;
+                    
+    //                 // 草の高さにバリエーション
+    //                 const grassHeight = height * (0.7 + Math.random() * 0.6);
+                    
+    //                 // 線の頂点を作成
+    //                 const linePositions = [
+    //                     worldX, grassY, worldZ,                    // 根本
+    //                     worldX, grassY + grassHeight, worldZ       // 先端
+    //                 ];
+                    
+    //                 // 線のジオメトリを作成
+    //                 const lineGeometry = new THREE.BufferGeometry();
+    //                 lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+                    
+    //                 // 線を作成
+    //                 const grassLine = new THREE.LineSegments(lineGeometry, grassMaterial);
+    //                 grassLines.push(grassLine);
+                    
+    //                 // 最初の草の位置をログ出力
+    //                 if (grassIndex === 0) {
+    //                     console.log(`最初の草の位置: (${worldX.toFixed(2)}, ${grassY.toFixed(2)}, ${worldZ.toFixed(2)}) 地形高度: ${terrainHeight.toFixed(2)}`);
+    //                 }
+                    
+    //                 grassIndex++;
+    //             }
+    //         }
+            
+    //         // 全ての草の線をチャンクグループに追加
+    //         grassLines.forEach(grassLine => {
+    //             chunkGroup.add(grassLine);
+    //         });
+            
+    //         // チャンクのuserDataに保存
+    //         chunkGroup.userData.simpleGrass = grassLines;
+            
+    //         console.log(`草配置完了: チャンク(${chunkX}, ${chunkZ}) に ${clusterCount}個のクラスター、合計${grassIndex}本の草を配置`);
+            
+    //     } catch (e) {
+    //         console.warn('チャンクへの草配置に失敗:', e);
+    //     }
+    // }
+    
+    // チャンクの草を削除するメソッド
+    // removeGrassFromChunk(chunkGroup) {
+    //     if (chunkGroup?.userData?.simpleGrass) {
+    //         // 既存の草を削除
+    //         chunkGroup.userData.simpleGrass.forEach(grassLine => {
+    //             chunkGroup.remove(grassLine);
+    //             grassLine.geometry.dispose();
+    //             grassLine.material.dispose();
+    //         });
+    //         chunkGroup.userData.simpleGrass = null;
+    //     }
+    // }
+    
+    // 草のLODシステム更新: プレイヤーチャンク変更時に影響を受けるチャンクの草を再生成（パフォーマンス最適化）
+    // updateGrassLOD(oldPlayerChunk, newPlayerChunk) {
+    //     try {
+    //         // 最適化: 影響する範囲を1チャンクに限定してパフォーマンスを向上
+    //         const affectedChunks = new Set();
+            
+    //         // 古いプレイヤーチャンク（密度を下げる）
+    //         affectedChunks.add(`${oldPlayerChunk.x},${oldPlayerChunk.z}`);
+            
+    //         // 新しいプレイヤーチャンク（密度を上げる）
+    //         affectedChunks.add(`${newPlayerChunk.x},${newPlayerChunk.z}`);
+            
+    //         // 影響を受けるチャンクの草を再生成
+    //         for (const chunkKey of affectedChunks) {
+    //             if (this.chunks.has(chunkKey)) {
+    //                 const [chunkX, chunkZ] = chunkKey.split(',').map(Number);
+    //                 const chunkGroup = this.chunks.get(chunkKey);
+                    
+    //                 // 既存の草を削除
+    //                 this.removeGrassFromChunk(chunkGroup);
+                    
+    //                 // 新しい密度で草を再生成
+    //                 this.populateGrassInChunk(chunkGroup, chunkX, chunkZ);
+    //             }
+    //         }
+            
+    //         console.log(`草LOD更新完了: ${affectedChunks.size}個のチャンクを更新（最適化版）`);
+            
+    //     } catch (e) {
+    //         console.warn('草LOD更新に失敗:', e);
+    //     }
+    // }
+    
     updateChunks(playerPosition) {
         const currentChunk = this.getChunkCoords(playerPosition.x, playerPosition.z);
         
         // プレイヤーのチャンクが変わったかチェック
         if (currentChunk.x !== this.playerChunk.x || currentChunk.z !== this.playerChunk.z) {
+            const oldPlayerChunk = { ...this.playerChunk };
             this.playerChunk = currentChunk;
             console.log(`プレイヤーがチャンク (${currentChunk.x}, ${currentChunk.z}) に移動`);
+            
+            // 草のLOD更新: 周辺チャンクの草密度を再計算
+            // this.updateGrassLOD(oldPlayerChunk, currentChunk);
         }
         
         const chunksToKeep = new Set();
@@ -1315,12 +1422,20 @@ class ChunkManager {
             
             // 削除距離を超えたチャンクのみ削除
             if (distance > this.deleteDistance) {
-                // 木（ツリー）の破棄・解放
+                // 木（ツリーグループ）の破棄・解放
                 if (chunkGroup.userData && Array.isArray(chunkGroup.userData.trees)) {
-                    for (const tree of chunkGroup.userData.trees) {
+                    for (const treeGroup of chunkGroup.userData.trees) {
                         try {
-                            if (tree && tree.parent) tree.parent.remove(tree);
-                            tree.traverse((obj) => {
+                            // windTrees配列からも削除
+                            if (gameState.windTrees && Array.isArray(gameState.windTrees)) {
+                                const index = gameState.windTrees.indexOf(treeGroup);
+                                if (index > -1) {
+                                    gameState.windTrees.splice(index, 1);
+                                }
+                            }
+                            
+                            if (treeGroup && treeGroup.parent) treeGroup.parent.remove(treeGroup);
+                            treeGroup.traverse((obj) => {
                                 if (obj.isMesh) {
                                     if (obj.geometry) obj.geometry.dispose();
                                     if (obj.material) {
@@ -1355,6 +1470,11 @@ class ChunkManager {
                     }
                     chunkGroup.userData.mountains = [];
                 }
+                
+                // シンプルな草のクリーンアップ
+                // if (chunkGroup.userData.simpleGrass) {
+                //     chunkGroup.userData.simpleGrass = null;
+                // }
 
                 this.scene.remove(chunkGroup);
                 
@@ -1373,7 +1493,7 @@ class ChunkManager {
 
                 
                 this.chunks.delete(key);
-                console.log(`チャンクを削除: ${key} (距離: ${distance})`);
+                // console.log(`チャンクを削除: ${key} (距離: ${distance})`);
             }
         }
     }
@@ -1506,8 +1626,6 @@ chunkManager.updateChunks(gameState.playerPosition);
 //     { center: { x: 120, z: -80 }, radius: 90, rimWidth: 18, waterLevel: -5.0, depth: 8, color: 0x2e5b73, opacity: 0.85 },
 //   ],
 // });
-
-console.log("無限地形＋湖システムを有効化しました");
 
 // 草機能は削除済み
 
@@ -2166,7 +2284,7 @@ varying vec3 vWorldPos;
                     const targetX = baseX - 60; // 左方向60m
                     const targetZ = baseZ + 20; // 前方20m
                     const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
-                    const scale = 20;
+                    const scale = 26;
                     temple.scale.set(scale, scale, scale);
                     temple.updateMatrixWorld(true);
                     const bbox = new THREE.Box3().setFromObject(temple);
@@ -2231,7 +2349,7 @@ varying vec3 vWorldPos;
                     const targetX = baseX + 50; // 右方向50m
                     const targetZ = baseZ - 40; // 後方40m
                     const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
-                    const scale = 18;
+                    const scale = 24;
                     temple.scale.set(scale, scale, scale);
                     temple.updateMatrixWorld(true);
                     const bbox = new THREE.Box3().setFromObject(temple);
@@ -2295,7 +2413,7 @@ varying vec3 vWorldPos;
                     const targetX = baseX - 30; // 左方向30m
                     const targetZ = baseZ - 60; // 後方60m
                     const h = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(targetX, targetZ) : 0;
-                    const scale = 22;
+                    const scale = 28;
                     temple.scale.set(scale, scale, scale);
                     temple.updateMatrixWorld(true);
                     const bbox = new THREE.Box3().setFromObject(temple);
@@ -2328,12 +2446,13 @@ varying vec3 vWorldPos;
                     gameState.dragonModel = gltf.scene;
                     // ドラゴンのサイズを設定
                     gameState.dragonModel.scale.set(20.5, 20.5, 20.5); // 1.5倍に拡大
-                    // 初期位置を空中に設定
-                    gameState.dragonModel.position.set(
-                        gameState.playerPosition.x + 20, // プレイヤーから少し離れた位置
-                        -3.0, // 地面より上の空中に配置
-                        gameState.playerPosition.z
-                    );
+                    // 初期位置を地形に合わせて設定
+                    const dragonX = gameState.playerPosition.x + 20;
+                    const dragonZ = gameState.playerPosition.z;
+                    const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(dragonX, dragonZ) : 0;
+                    const dragonY = -5.0 + terrainHeight + 3.0; // 地面から3ユニット上に配置
+                    
+                    gameState.dragonModel.position.set(dragonX, dragonY, dragonZ);
                     
                     // ドラゴンのマテリアル設定を調整（影の設定のみ）
                     gameState.dragonModel.traverse(function(child) {
@@ -2445,6 +2564,7 @@ let bgmSound = null;  // BGMを外部スコープで定義
 let windSound = null;  // 環境音も外部スコープで定義
 let audioInitialized = false;  // 音声が初期化されたかのフラグ
 
+
 // 音声を初期化する関数
 function initializeAudio() {
     if (audioInitialized) return;  // すでに初期化済みの場合はスキップ
@@ -2511,7 +2631,7 @@ function initializeAudio() {
             assetLoader.loadSound('patipati', (buffer) => {
                 patipatiSound.setBuffer(buffer);
                 patipatiSound.setLoop(false);
-                patipatiSound.setVolume(gameState.isMuted ? 0 : 0.6);
+                patipatiSound.setVolume(gameState.isMuted ? 0 : 0.3);
                 gameState.sounds.patipati = patipatiSound;
                 // console.log('パチパチ音読み込み成功');
             });
@@ -2551,7 +2671,7 @@ function initializeAudio() {
             assetLoader.loadSound('thunder', (buffer) => {
                 thunderSound.setBuffer(buffer);
                 thunderSound.setLoop(false);
-                thunderSound.setVolume(gameState.isMuted ? 0 : 0.7);
+                thunderSound.setVolume(gameState.isMuted ? 0 : 0.4);
                 gameState.sounds.thunder = thunderSound;
             });
 
@@ -2610,7 +2730,7 @@ function initializeAudio() {
                         if (gameState.sounds.thunder.isPlaying) {
                             gameState.sounds.thunder.stop();
                         }
-                        gameState.sounds.thunder.setVolume(0.7);
+                        gameState.sounds.thunder.setVolume(0.4);
                         gameState.sounds.thunder.play();
                     } else {
                         console.warn('雷音が利用できません');
@@ -2947,8 +3067,8 @@ window.addEventListener('mousemove', (e) => {
     const deltaX = e.clientX - gameState.dragStartX;
     const deltaY = e.clientY - gameState.dragStartY;
     
-    // ドラッグの移動量が閾値を超えた場合のみ処理
-    if (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold) {
+    // ドラッグの移動量が閾値を超えた場合のみ処理（自由視点モード時は無効化）
+    if (!gameState.freeCamera && (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold)) {
         // 移動方向を判定
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
             // 横方向の移動が大きい
@@ -2994,8 +3114,8 @@ window.addEventListener('touchmove', (e) => {
     const deltaX = touch.clientX - gameState.dragStartX;
     const deltaY = touch.clientY - gameState.dragStartY;
     
-    // ドラッグの移動量が閾値を超えた場合のみ処理
-    if (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold) {
+    // ドラッグの移動量が閾値を超えた場合のみ処理（自由視点モード時は無効化）
+    if (!gameState.freeCamera && (Math.abs(deltaX) > gameState.dragThreshold || Math.abs(deltaY) > gameState.dragThreshold)) {
         // 移動方向を判定
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
             // 横方向の移動が大きい
@@ -3274,7 +3394,7 @@ function movePlayer() {
         if (!gameState.footstepTimer || gameState.footstepTimer <= 0) {
             playFootstepSound(gameState);
             // 次の足音までの間隔をリセット
-            gameState.footstepTimer = 20;
+            gameState.footstepTimer = 15;
         } else {
             // タイマーを減少
             gameState.footstepTimer--;
@@ -3397,10 +3517,22 @@ let frameCount = 0; // フレームカウンター
 function animate() {
     requestAnimationFrame(animate);
     frameCount++; // フレームカウンターを更新
+    if (!gameState.frameCount) gameState.frameCount = 0;
+    gameState.frameCount++;
 
     const delta = clock.getDelta();
     // 湖の更新（停止中）
     // updateLakeSystem(delta);
+
+    // 草フィールドの更新（一時的に無効化）
+    // if (gameState.grassFields && gameState.grassFields.length > 0) {
+    //     const elapsedTime = performance.now() * 0.001;
+    //     for (const grassField of gameState.grassFields) {
+    //         if (grassField && grassField.update) {
+    //             grassField.update(elapsedTime);
+    //         }
+    //     }
+    // }
 
     // ゲームオーバー時は処理を減らす
     if (gameState.isGameOver) {
@@ -3444,16 +3576,30 @@ function animate() {
         });
     }
 
-        // 樹木の風揺れ（上部のみ）時間更新
-        if (gameState.treeWindMaterials && gameState.treeWindMaterials.length) {
-            const t = performance.now() * 0.001; // より大きく進む時間
-            const windStrength = 1.5 + gameState.windStrength * 1.2;
-            const windVec = new THREE.Vector2(Math.sin(t * 0.2), Math.cos(t * 0.17)).normalize().multiplyScalar(windStrength);
-            for (const mat of gameState.treeWindMaterials) {
-                const sh = mat.userData && mat.userData.shader ? mat.userData.shader : null;
-                if (sh && sh.uniforms) {
-                    if (sh.uniforms.uTime) sh.uniforms.uTime.value = t * 1.6; // 進行を加速
-                    if (sh.uniforms.uWind) sh.uniforms.uWind.value.copy(windVec);
+        // 樹木の風揺れ（根本固定、上部のみ揺れる）時間更新
+        if (gameState.windTrees && gameState.windTrees.length) {
+            const t = performance.now() * 0.001;
+            const windStrength = (gameState.windStrength || 1.0) * 2.0; // 基本強度を2.0倍に
+            
+            for (const treeGroup of gameState.windTrees) {
+                if (treeGroup.userData && treeGroup.userData.windAnimation) {
+                    const anim = treeGroup.userData.windAnimation;
+                    
+                    // より複雑な風の揺れを計算（複数の波を組み合わせ、より穏やか）
+                    const primary = Math.sin(t * 0.8 + anim.phase) * anim.amplitude;
+                    const secondary = Math.sin(t * 1.6 + anim.phase * 1.7) * anim.amplitude * 0.3;
+                    const gust = Math.sin(t * 0.3 + anim.phase * 0.5) * anim.amplitude * 0.6;
+                    
+                    const windX = (primary + secondary + gust) * windStrength;
+                    const windZ = (Math.cos(t * 0.6 + anim.phase) + Math.cos(t * 1.2 + anim.phase * 1.3) * 0.4) * anim.amplitude * windStrength * 0.8;
+                    
+                    // グループの回転を適用（根本が軸になる）
+                    treeGroup.rotation.x = anim.originalRotation.x + windZ;
+                    treeGroup.rotation.z = anim.originalRotation.z + windX;
+                    
+                    // Y軸にもわずかな回転を追加（より自然な動き、控えめ）
+                    const windY = Math.sin(t * 0.5 + anim.phase * 2) * anim.amplitude * windStrength * 0.15;
+                    treeGroup.rotation.y = anim.originalRotation.y + windY;
                 }
             }
         }
@@ -3576,7 +3722,7 @@ function animate() {
                     Math.pow(px - column.origin.x, 2) + 
                     Math.pow(pz - column.origin.z, 2)
                 );
-                if (distance < 3) { // 半径3の範囲内で回復
+                if (distance < 4.5) { // 半径4.5の範囲内で回復（拡大）
                     isInHealingArea = true;
                     break;
                 }
@@ -3592,6 +3738,13 @@ function animate() {
             // 回復中フラグを設定
             if (!gameState.isHealing) {
                 gameState.isHealing = true;
+                
+                // 魔法陣に入った瞬間に即座に回復
+                gameState.currentHealth += gameState.healingAmount;
+                if (gameState.currentHealth > gameState.playerHealth) {
+                    gameState.currentHealth = gameState.playerHealth;
+                }
+                gameState.healingTimer = gameState.healingInterval; // タイマーをリセット
                 
                 // 回復音を再生
                 if (gameState.sounds.heal && gameState.sounds.heal.buffer) {
@@ -3694,6 +3847,13 @@ function animate() {
             gameState.playerPosition.y + 5,
             gameState.playerPosition.z
         );
+    }
+
+    // カメラが地面にめり込まないように調整
+    const cameraTerrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(camera.position.x, camera.position.z) : 0;
+    const minCameraY = -5.0 + cameraTerrainHeight + 0.5; // 地面から0.5ユニット上
+    if (camera.position.y < minCameraY) {
+        camera.position.y = minCameraY;
     }
 
     // OrbitControlsの更新（すべてのカメラモードで有効）
@@ -3910,6 +4070,7 @@ function showGameScreen() {
     // プレイヤーの体力を満タンにリセット
     gameState.currentHealth = gameState.playerHealth;
     
+    
     // 音声を初期化（初回のみ）
     initializeAudio();
     
@@ -4079,6 +4240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // ミュート状態を動画にも適用
             introVideo.muted = gameState.isMuted;
+            introVideo.volume = 0.5; // 動画の音量を下げる
                 
             // ビデオイベントを設定
             setupVideoEvents();

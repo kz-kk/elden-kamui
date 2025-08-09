@@ -238,10 +238,13 @@ export function createDragonFlameEffect(gameState, scene) {
     const updateParticle = (i, positions, velocities, lifetimes, isGroundFlame) => {
         const i3 = i * 3;
         
-        // 地面に到達した場合の処理
-        if (!isGroundFlame[i] && positions[i3 + 1] <= gameState.groundLevel + 0.2) {
+        // 地面に到達した場合の処理（地形に沿うように修正）
+        const terrainHeight = gameState.chunkManager ? gameState.chunkManager.getHeightAtPosition(positions[i3], positions[i3 + 2]) : 0;
+        const groundY = -5.0 + terrainHeight;
+        
+        if (!isGroundFlame[i] && positions[i3 + 1] <= groundY + 0.2) {
             isGroundFlame[i] = 1;
-            positions[i3 + 1] = gameState.groundLevel + 0.1;
+            positions[i3 + 1] = groundY + 0.1;
             
             // プレイヤーの方向を考慮した速度の設定
             if (gameState.playerModel) {

@@ -203,7 +203,7 @@ export class GLSLLightningSystem {
     // time が NaN になることを防ぐ
     if (isNaN(this.time)) {
       this.time = 0.0;
-      console.log("time が NaN だったため、0にリセット");
+      // console.log("time が NaN だったため、0にリセット");
     }
     this.time += deltaTime; // アニメーション用の時間更新
     
@@ -222,7 +222,6 @@ export class GLSLLightningSystem {
           this.addExplosion(this.lightningTargetPosition);
         }
         
-        console.log("雷が消えて爆発発生 - 経過時間:", elapsed);
       }
     }
   }
@@ -917,7 +916,7 @@ export class GLSLLightningSystem {
       window.gameState.lightningDamagePosition = new THREE.Vector3(position[0], position[1], position[2]);
       window.gameState.lightningDamageTimer = window.gameState.lightningDamageDuration;
       window.gameState.lightningDamageRadius = 4.0; // 3.0から4.0に拡大（上向き放電も含めるため）
-      console.log("雷ダメージ判定を有効化 - 拡散位置:", position, "範囲:", window.gameState.lightningDamageRadius);
+      // console.log("雷ダメージ判定を有効化 - 拡散位置:", position, "範囲:", window.gameState.lightningDamageRadius);
     }
     
     this.explosions.push(explosion);

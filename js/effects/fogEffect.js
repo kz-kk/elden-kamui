@@ -8,11 +8,11 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.m
  * @returns {Object} 生成された霧エフェクトオブジェクト
  */
 export function createFogEffect(gameState, scene) {
-    // ランダムな位置を選択（シーン内のどこかに）
+    // ランダムな位置を選択（エリア全域に）
     const fogOrigin = new THREE.Vector3(
-        (Math.random() - 0.5) * 80, // X座標の範囲を広げる
+        (Math.random() - 0.5) * 300, // X座標の範囲をさらに拡大
         0.02, // 地面により近く
-        (Math.random() - 0.5) * 80  // Z座標の範囲を広げる
+        (Math.random() - 0.5) * 300  // Z座標の範囲をさらに拡大
     );
     
     // パーティクルのジオメトリ
@@ -27,7 +27,7 @@ export function createFogEffect(gameState, scene) {
     const colors = new Float32Array(particleCount * 3);
     
     // 霧の広がり範囲
-    const fogRadius = 15 + Math.random() * 20; // 15〜35の範囲に拡大
+    const fogRadius = 40 + Math.random() * 60; // 40〜100の範囲に大幅拡大
     
     // 霧のパーティクルを生成
     for (let i = 0; i < particleCount; i++) {

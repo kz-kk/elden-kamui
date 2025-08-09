@@ -129,7 +129,7 @@ export function applyDamage(gameState, amount, gameOverCallback) {
  * @param {number} amount - ダメージ量
  */
 export function applyDragonDamage(gameState, amount) {
-    console.log(`applyDragonDamage関数が呼び出されました。ダメージ量: ${amount}, ドラゴン体力: ${gameState.currentDragonHealth}`);
+    // console.log(`applyDragonDamage関数が呼び出されました。ダメージ量: ${amount}, ドラゴン体力: ${gameState.currentDragonHealth}`);
     // ドラゴンが無敵状態ならダメージを与えない
     if (gameState.isDragonInvincible) {
         console.log('ドラゴンは無敵状態です');

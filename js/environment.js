@@ -687,7 +687,7 @@ export function addRocks(scene, gameState) {
                             // 10%の確率で大きな岩を生成
                             if (Math.random() < 0.1) {
                                 sizeScale = 4.0 + Math.random() * 2.0; // 4.0〜6.0の大型岩
-                                console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
+                                // console.log(`大型岩を生成: サイズ=${sizeScale.toFixed(2)}`);
                             } else {
                                 sizeScale = 1.5 + Math.random() * 2.0; // 1.5〜3.5の通常岩
                             }
@@ -780,7 +780,7 @@ export function addRocks(scene, gameState) {
                     // 岩の生成開始
                     createRockBatch();
                     
-                    console.log(`${rockCount}個の岩の配置を開始しました...`);
+                    // console.log(`${rockCount}個の岩の配置を開始しました...`);
                 },
                 null,
                 function(error) {

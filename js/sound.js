@@ -126,7 +126,7 @@ export function playThunderSound(gameState, audioLoader) {
             if (gameState.sounds.thunder.isPlaying) {
                 gameState.sounds.thunder.stop();
             }
-            gameState.sounds.thunder.setVolume(0.7); // 音量を調整
+            gameState.sounds.thunder.setVolume(0.4); // 音量を調整
             gameState.sounds.thunder.play();
             console.log('雷音再生実行完了');
         } else if (gameState.sounds.fire && gameState.sounds.fire.buffer) {

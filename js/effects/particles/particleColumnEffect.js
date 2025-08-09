@@ -222,8 +222,8 @@ export function createParticleColumn(gameState, scene) {
         particleCount,
         origin: columnOrigin.clone(),
         time: 0,
-        lifetime: gameState.healingAreaLifetime || 600,
-        maxLifetime: gameState.healingAreaLifetime || 600,
+        lifetime: 600,
+        maxLifetime: 600,
         
         // パーティクルデータ
         positions,
