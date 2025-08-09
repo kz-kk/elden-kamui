@@ -4297,6 +4297,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!introVideo.paused) {
                     introVideo.pause();
                 }
+                // 動画を明示的に非表示
+                introVideo.style.display = 'none';
+                introVideo.currentTime = 0;
                 if (!gameState.gameStarted) {
                     showGameScreen();
                 }
@@ -4310,6 +4313,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     introVideo.pause();
                 }
                 gameState.videoPlaying = false;
+                // 動画を明示的に非表示
+                introVideo.style.display = 'none';
+                introVideo.currentTime = 0;
                 if (!gameState.gameStarted) {
                     // 少し遅延を入れてから画面遷移（スムーズな切り替えのため）
                     setTimeout(() => {
@@ -4375,6 +4381,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (!introVideo.paused) {
                                 introVideo.pause();
                             }
+                            // 動画を明示的に非表示
+                            introVideo.style.display = 'none';
+                            introVideo.currentTime = 0;
                             showGameScreen();
                         }
                     }, 5000); // 5秒後に自動終了
