@@ -654,7 +654,7 @@ if (!isMobile) {
 // glTF/PBR を正しく表示（騎士が黒くなるのを防ぐ）
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
+renderer.toneMappingExposure = 0.65; // 0.85→0.65に暗く調整
 
 // 最初からcanvasを表示する（地面が消えたように見えるのを防ぐ）
 renderer.domElement.style.display = 'block';
@@ -797,7 +797,7 @@ cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切
 // document.body.appendChild(cameraInfo);
 
 // 光源の設定
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.02); // 環境光をほぼゼロに
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.015); // 環境光をさらに暗く
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.08); // メイン光源を極限まで暗く
@@ -872,9 +872,9 @@ class ChunkManager {
         this.groundTexture.wrapT = THREE.RepeatWrapping;
         this.groundTexture.repeat.set(10, 10);
 
-        // チャンク内に配置する木の設定（軽量化のため大幅削減）
-        this.minTreesPerChunk = 15; // ランダム最小数
-        this.maxTreesPerChunk = 25; // ランダム最大数
+        // チャンク内に配置する木の設定（適度に軽量化）
+        this.minTreesPerChunk = 45; // ランダム最小数
+        this.maxTreesPerChunk = 60; // ランダム最大数
         this.treeTemplates = []; // 複数のGLBテンプレート配列
         this.treeLoader = new GLTFLoader();
         this.treeModelUrls = [
@@ -989,7 +989,7 @@ class ChunkManager {
         if (!this.sharedMaterial) {
             this.sharedMaterial = new THREE.MeshStandardMaterial({
                 map: this.groundTexture,
-                color: 0x151515,  // 少し明るく
+                color: 0x0a0a0a,  // さらに暗く調整（0x151515 → 0x0a0a0a）
                 roughness: 1.0,
                 metalness: 0.0,
                 emissive: new THREE.Color(0x000000) // 発光なし
@@ -3118,6 +3118,28 @@ function initializeMobileControls() {
             gameState.keysPressed['r'] = false;
         });
     }
+    
+    // モバイルカメラボタンのイベントリスナー
+    const mobileCameraButton = document.getElementById('mobileCameraButton');
+    if (mobileCameraButton) {
+        console.log('モバイルカメラボタンが見つかりました');
+        mobileCameraButton.addEventListener('touchstart', (e) => {
+            console.log('カメラボタンtouchstart');
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCameraMode(gameState, controls, camera, null); // 必要な引数を渡す
+        });
+        mobileCameraButton.addEventListener('click', (e) => {
+            console.log('カメラボタンclick');
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCameraMode(gameState, controls, camera, null); // 必要な引数を渡す
+        });
+        mobileCameraButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
 }
 
 window.addEventListener('keyup', (e) => {
@@ -4136,6 +4158,11 @@ function showGameScreen() {
         const mobileActionButtons = document.getElementById('mobileActionButtons');
         if (mobileActionButtons) {
             mobileActionButtons.style.display = 'flex';
+        }
+        
+        const mobileCameraButton = document.getElementById('mobileCameraButton');
+        if (mobileCameraButton) {
+            mobileCameraButton.style.setProperty('display', 'flex', 'important');
         }
     }
     
