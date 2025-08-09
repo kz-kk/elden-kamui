@@ -435,6 +435,11 @@ const gameState = {
     dragStartX: 0,
     dragStartY: 0,
     dragThreshold: 10, // ドラッグと判定する最小移動距離
+    
+    // ジョイスティック操作関連
+    joystickActive: false,
+    joystickCenterX: 0,
+    joystickCenterY: 0,
 };
 
 // AssetLoaderを初期化
@@ -3195,20 +3200,83 @@ window.addEventListener('mouseup', () => {
 window.addEventListener('touchstart', (e) => {
     if (!gameState.gameStarted || gameState.isGameOver) return;
     
+    const touch = e.touches[0];
+    
+    // ジョイスティック領域でのタッチをチェック
+    const joystickBase = document.getElementById('joystickBase');
+    const joystickRect = joystickBase ? joystickBase.getBoundingClientRect() : null;
+    
+    if (joystickRect && 
+        touch.clientX >= joystickRect.left && touch.clientX <= joystickRect.right &&
+        touch.clientY >= joystickRect.top && touch.clientY <= joystickRect.bottom) {
+        // ジョイスティック領域でのタッチ
+        gameState.joystickActive = true;
+        gameState.joystickCenterX = joystickRect.left + joystickRect.width / 2;
+        gameState.joystickCenterY = joystickRect.top + joystickRect.height / 2;
+        gameState.dragStartX = touch.clientX;
+        gameState.dragStartY = touch.clientY;
+        return;
+    }
+    
     // モバイルボタン上でのタッチは無視
     if (e.target.classList.contains('mobile-control') || 
         e.target.closest('.mobile-control')) return;
     
-    const touch = e.touches[0];
     gameState.isDragging = true;
     gameState.dragStartX = touch.clientX;
     gameState.dragStartY = touch.clientY;
 });
 
 window.addEventListener('touchmove', (e) => {
-    if (!gameState.isDragging || !gameState.gameStarted || gameState.isGameOver) return;
+    if (!gameState.gameStarted || gameState.isGameOver) return;
     
     const touch = e.touches[0];
+    
+    // ジョイスティックが活性化されている場合の処理
+    if (gameState.joystickActive) {
+        const joystickKnob = document.getElementById('joystickKnob');
+        
+        // ジョイスティック中心からの距離と角度を計算
+        const deltaX = touch.clientX - gameState.joystickCenterX;
+        const deltaY = touch.clientY - gameState.joystickCenterY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const maxDistance = 25; // ジョイスティックの最大移動距離
+        
+        // ジョイスティックの範囲内に制限
+        const clampedDistance = Math.min(distance, maxDistance);
+        const angle = Math.atan2(deltaY, deltaX);
+        
+        const knobX = Math.cos(angle) * clampedDistance;
+        const knobY = Math.sin(angle) * clampedDistance;
+        
+        // ノブの位置を更新
+        if (joystickKnob) {
+            joystickKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+            joystickKnob.classList.add('active');
+        }
+        
+        // 移動入力に変換（自由視点モードでも移動可能）
+        const inputThreshold = 10;
+        if (clampedDistance > inputThreshold) {
+            const intensity = (clampedDistance - inputThreshold) / (maxDistance - inputThreshold);
+            
+            gameState.keysPressed['ArrowLeft'] = knobX < -inputThreshold;
+            gameState.keysPressed['ArrowRight'] = knobX > inputThreshold;
+            gameState.keysPressed['ArrowUp'] = knobY < -inputThreshold;
+            gameState.keysPressed['ArrowDown'] = knobY > inputThreshold;
+        } else {
+            // 中央付近では移動停止
+            gameState.keysPressed['ArrowLeft'] = false;
+            gameState.keysPressed['ArrowRight'] = false;
+            gameState.keysPressed['ArrowUp'] = false;
+            gameState.keysPressed['ArrowDown'] = false;
+        }
+        return;
+    }
+    
+    // 通常のドラッグ処理（自由視点モード以外）
+    if (!gameState.isDragging) return;
+    
     const deltaX = touch.clientX - gameState.dragStartX;
     const deltaY = touch.clientY - gameState.dragStartY;
     
@@ -3228,14 +3296,25 @@ window.addEventListener('touchmove', (e) => {
 });
 
 window.addEventListener('touchend', () => {
+    // ジョイスティックの状態をリセット
+    if (gameState.joystickActive) {
+        gameState.joystickActive = false;
+        const joystickKnob = document.getElementById('joystickKnob');
+        if (joystickKnob) {
+            joystickKnob.style.transform = 'translate(-50%, -50%)';
+            joystickKnob.classList.remove('active');
+        }
+    }
+    
     if (gameState.isDragging) {
         gameState.isDragging = false;
-        // ドラッグ終了時に全ての方向キーをリセット
-        gameState.keysPressed['ArrowUp'] = false;
-        gameState.keysPressed['ArrowDown'] = false;
-        gameState.keysPressed['ArrowLeft'] = false;
-        gameState.keysPressed['ArrowRight'] = false;
     }
+    
+    // 全ての方向キーをリセット
+    gameState.keysPressed['ArrowUp'] = false;
+    gameState.keysPressed['ArrowDown'] = false;
+    gameState.keysPressed['ArrowLeft'] = false;
+    gameState.keysPressed['ArrowRight'] = false;
 });
 
 // ウィンドウリサイズ時の処理
