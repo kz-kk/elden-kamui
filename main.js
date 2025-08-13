@@ -802,7 +802,7 @@ cameraInfo.innerHTML = 'カメラモード: プレイヤー軌道 (Cキーで切
 // document.body.appendChild(cameraInfo);
 
 // 光源の設定
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.015); // 環境光をさらに暗く
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.025); // 環境光をさらに暗く
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.08); // メイン光源を極限まで暗く
